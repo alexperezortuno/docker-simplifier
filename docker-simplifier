@@ -1,0 +1,207 @@
+#!/bin/bash
+
+PARAM_1=$1
+PARAM_2=$2
+PARAM_3=$3
+PARAM_4=$4
+CONTAINER_NAME=""
+CONTAINER_IMAGE=""
+CONTAINER_PORT="83:83"
+IMAGE_NAME=""
+
+RCol='\e[0m'
+Yel='\e[033m'
+Red='\e[031m'
+Gre='\e[032m'
+Divider='=============================================================='
+
+QUESTION_SET_FOLDER=""
+SET_DOCKIFY_PROJECT_FOLDER=""
+
+case "$PARAM_1" in
+    "containers:stop")
+    echo -e "${Yel}"
+    echo "Stopping all containers"
+    docker stop $(docker ps -a -q)
+    echo -e "${RCol}"
+   ;;
+   "containers:remove")
+        echo -e "${Yel}"
+        echo "Removing all containers"
+        echo -e "${Divider}\r"
+        docker stop $(docker ps -a -q)
+        docker rm $(docker ps -a -q)
+        # Remove with filters
+        # docker rm $(docker ps -a -f status=exited -f status=created)
+        echo -e "${RCol}"
+   ;;
+   "containers:init")
+        echo -e "${Gre}"
+        echo "Initializing containers"
+        echo -e "${Divider}\r"
+        eval "${DOCKIFY_FOLDER}/./container"
+        echo -e "${RCol}"
+   ;;
+   "container:start")
+        echo -e "${Yel}"
+        echo "Starting ${PARAM_2}"
+        echo -e "${Divider}\r"
+
+        if [[ "${PARAM_3,,}" == "-s" || "${PARAM_3,,}" == "s" ]]
+            then
+            docker start $PARAM_2
+        else
+            cd $DOCKIFY_PROJECT_FOLDER
+            eval "docker-compose up -d $PARAM_2"
+        fi
+        echo -e "${RCol}"
+   ;;
+   "container:stop")
+        echo -e "${Yel}"
+        echo "Stopping ${PARAM_2}"
+        echo -e "${Divider}\r"
+        if [[ "${PARAM_3,,}" == "-s" || "${PARAM_3,,}" == "s" || "${PARAM_3,,}" == "solo" ]]
+            then
+            docker stop $PARAM_2
+        else
+            cd $DOCKIFY_PROJECT_FOLDER
+            eval "docker-compose stop $PARAM_2"
+        fi
+        echo -e "${RCol}"
+   ;;
+   "container:create")
+        echo -e "${Yel}Please write a name for the container :  ${RCol}\r"
+        read CONTAINER_NAME
+        echo -e "${Yel}Please set a port for the container (DEFAULT is 83:83) :  ${RCol}\r"
+        read CONTAINER_PORT
+        echo -e "${Yel}Please set the image from where create the container :  ${RCol}\r"
+        read CONTAINER_IMAGE
+        echo -e "${Yel}Starting process, please wait to finish ${Divider}${RCol}\r"
+        docker run -d --name=${CONTAINER_NAME} -p ${CONTAINER_PORT} ${CONTAINER_IMAGE}
+        echo -e "${Gre} Process finish  ${RCol}\r"
+        exit 1
+   ;;
+   "container:remove")
+       echo -e "${Yel}"
+       echo "Removing container"
+       echo -e "${Divider}"
+       docker container ls -a
+       echo -e ${RCol}
+       echo -e "${Gre}Which one? :  ${RCol}\r"
+       read CONTAINER_NAME
+       docker container stop $CONTAINER_NAME
+       docker container rm $CONTAINER_NAME
+   ;;
+   "images:remove")
+        echo -e "${Yel}"
+        echo "Removing all images"
+        echo -e "${Divider}"
+        if [[ ! -z "${PARAM_2}" ]]
+        then
+            docker image ls
+            echo -e "${Gre}Which one? :  ${RCol}\r"
+            read IMAGE_NAME
+            docker image rm ${IMAGE_NAME}
+        else
+            docker-compose up -d
+            # Stop all containers
+            docker stop $(docker ps -a -q)
+            # Remove all containers
+            docker rm $(docker ps -a -q)
+            # Remove all images
+            docker rmi $(docker images -a -q)
+        fi
+        echo -e "${RCol}"
+   ;;
+   "images:pull")
+       echo -e "${Yel}"
+       echo "Pulling images"
+       echo -e "${Divider}"
+
+       if [[ "${PARAM_2,,}" == "-s" || "${PARAM_2,,}" == "s" || "${PARAM_2,,}" == "solo" ]]
+       then
+            docker-compose up -d
+       elif [[ "${PARAM_3,,}" == "-s" || "${PARAM_3,,}" == "s" || "${PARAM_3,,}" == "solo" ]]
+       then
+            eval "docker-compose up -d ${PARAM_2}"
+       else
+            eval "${DOCKIFY_FOLDER}/./container"
+       fi
+       echo -e "${RCol}"
+   ;;
+   "project:folder:set")
+        echo -e "${Yel} You want set the project folder? [y/N]:  ${RCol}\r"
+        read QUESTION_SET_FOLDER
+        QUESTION_SET_FOLDER="${QUESTION_SET_FOLDER,,}"
+        if [[ ${QUESTION_SET_FOLDER} = "y" || ${QUESTION_SET_FOLDER} = "yes" ]]
+            then
+            echo -e "${Yel} Write the project folder:  ${RCol}\r"
+            read SET_DOCKIFY_PROJECT_FOLDER
+            SET_DOCKIFY_PROJECT_FOLDER="${SET_DOCKIFY_PROJECT_FOLDER,,}"
+
+            if [[ "${SET_DOCKIFY_PROJECT_FOLDER}" != "" ]]
+                then
+                sed -i 's/export DOCKIFY_PROJECT_FOLDER.*//g' ~/.bashrc
+                echo "export DOCKIFY_PROJECT_FOLDER='${SET_DOCKIFY_PROJECT_FOLDER}'" >> ~/.bashrc
+                eval "source ~/.bashrc"
+                echo -e "${Yel} Success!  ${RCol}\r"
+            fi
+        fi
+   ;;
+   "list")
+       echo -e "${Gre}"
+       echo -e "Docker Simplifier\r"
+       echo -e "${RCol}"
+       echo -e "${Divider}\r"
+       echo -e "${Yel}"
+       echo -e "COMMAND\t\t\t\tDESCRIPTION\n"
+       echo -e "containers:stop\t\t\tStop all containers\r"
+       echo -e "containers:remove\t\tStop and remove all containers\r"
+       echo -e "containers:init\t\t\tInitialize all containers\r"
+       echo -e "container:start\t\t\tStart one container by name\r"
+       echo -e "container:stop\t\t\tStop container by name\r"
+       echo -e "images:remove\t\t\tRemove all images\r"
+       echo -e "images:pull\t\t\tPull all images from dockerhub and registry gitlab\r"
+       echo -e "${RCol}"
+   ;;
+   "check-install")
+        echo "Installation successfull, good work"
+   ;;
+   "network")
+        docker network ls
+   ;;
+   "network:create")
+        echo -e "${Yel}"
+        echo "Creating network"
+        echo -e "${Divider}"
+        docker network create $PARAM_2
+   ;;
+   "network:remove")
+        echo -e "${Yel}"
+        echo "Creating network"
+        echo -e "${Divider}"
+        docker network rm $PARAM_2
+   ;;
+   "volume")
+        docker volume ls
+   ;;
+   "volume:create")
+        echo -e "${Yel}"
+        echo "Creating volumen"
+        echo -e "${Divider}"
+        docker volume create --name=$PARAM_2
+   ;;
+   "volume:remove")
+        echo -e "${Yel}"
+        echo "Removing volumen"
+        echo -e "${Divider}"
+        docker volume rm $PARAM_2
+   ;;
+   *)
+    echo "${Red}"
+    echo "I don't know what to do"
+    echo "${RCol}"
+    ;;
+esac
+
+exit 1
