@@ -19,27 +19,31 @@ QUESTION_SET_FOLDER=""
 SET_DOCKIFY_PROJECT_FOLDER=""
 
 case "$PARAM_1" in
-    "containers:stop")
-    echo -e "${Yel}"
-    echo "Stopping all containers"
-    docker stop $(docker ps -a -q)
-    echo -e "${RCol}"
-   ;;
-   "containers:remove")
+   "container:remove")
         echo -e "${Yel}"
         echo "Removing all containers"
         echo -e "${Divider}\r"
-        docker stop $(docker ps -a -q)
-        docker rm $(docker ps -a -q)
+        if [[ "${PARAM_2,,}" == "-s" || "${PARAM_2,,}" == "s" ]]
+        then
+            docker-compose down
+        else
+            docker stop $(docker ps -a -q)
+            docker rm $(docker ps -a -q)
+        fi
         # Remove with filters
         # docker rm $(docker ps -a -f status=exited -f status=created)
         echo -e "${RCol}"
    ;;
-   "containers:init")
+   "container:init")
         echo -e "${Gre}"
         echo "Initializing containers"
         echo -e "${Divider}\r"
-        eval "${DOCKIFY_FOLDER}/./container"
+        if [[ "${PARAM_2,,}" == "-s" || "${PARAM_2,,}" == "s" ]]
+        then
+            docker-compose up -d
+        else
+            eval "${DOCKIFY_FOLDER}/./container"
+        fi
         echo -e "${RCol}"
    ;;
    "container:start")
@@ -60,8 +64,11 @@ case "$PARAM_1" in
         echo -e "${Yel}"
         echo "Stopping ${PARAM_2}"
         echo -e "${Divider}\r"
-        if [[ "${PARAM_3,,}" == "-s" || "${PARAM_3,,}" == "s" || "${PARAM_3,,}" == "solo" ]]
-            then
+        if [[ "${PARAM_2,,}" == "-a" || "${PARAM_2,,}" == "a" || "${PARAM_2,,}" == "all" ]]
+        then
+            docker stop $(docker ps -a -q)
+        elif [[ "${PARAM_3,,}" == "-s" || "${PARAM_3,,}" == "s" || "${PARAM_3,,}" == "solo" ]]
+        then
             docker stop $PARAM_2
         else
             cd $DOCKIFY_PROJECT_FOLDER
@@ -96,7 +103,10 @@ case "$PARAM_1" in
         echo -e "${Yel}"
         echo "Removing all images"
         echo -e "${Divider}"
-        if [[ ! -z "${PARAM_2}" ]]
+        if [[ "${PARAM_2,,}" == "-a" || "${PARAM_2,,}" == "a" ]]
+        then
+            docker-compose down --rmi local
+        elif [[ "${PARAM_2,,}" == "-o" || "${PARAM_2,,}" == "o" ]]
         then
             docker image ls
             echo -e "${Gre}Which one? :  ${RCol}\r"
@@ -121,7 +131,7 @@ case "$PARAM_1" in
        if [[ "${PARAM_2,,}" == "-s" || "${PARAM_2,,}" == "s" || "${PARAM_2,,}" == "solo" ]]
        then
             docker-compose up -d
-       elif [[ "${PARAM_3,,}" == "-s" || "${PARAM_3,,}" == "s" || "${PARAM_3,,}" == "solo" ]]
+       elif [[ "${PARAM_3,,}" == "-0" || "${PARAM_3,,}" == "0" || "${PARAM_3,,}" == "one" ]]
        then
             eval "docker-compose up -d ${PARAM_2}"
        else
@@ -195,7 +205,17 @@ case "$PARAM_1" in
         echo -e "${Yel}"
         echo "Removing volumen"
         echo -e "${Divider}"
-        docker volume rm $PARAM_2
+
+        if [[ "${PARAM_2}" == "-a" ]]
+        then
+            docker volume rm $(docker volume ls -q)
+        elif [[ "${PARAM_2}" != "" ]]
+        then
+            docker volume rm $PARAM_2
+        else
+            echo -e "\e[7mYou must set a valid volume, these are available\e[0m"
+            docker volume ls -q
+        fi
    ;;
    *)
     echo "${Red}"
