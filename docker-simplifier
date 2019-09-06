@@ -8,6 +8,7 @@ CONTAINER_NAME=""
 CONTAINER_IMAGE=""
 CONTAINER_PORT="83:83"
 IMAGE_NAME=""
+DOCKER_COMPOSE_FILE="`pwd`/docker-compose.yml"
 
 RCol='\e[0m'
 Yel='\e[033m'
@@ -18,28 +19,24 @@ Divider='=============================================================='
 QUESTION_SET_FOLDER=""
 SET_DOCKIFY_PROJECT_FOLDER=""
 
+function dockerComposeExist() {
+    if [[ -f "$DOCKER_COMPOSE_FILE" ]]; then
+        DOCKER_COMPOSE_FILE_EXIST=1
+    else
+        DOCKER_COMPOSE_FILE_EXIST=0
+        echo -e "${Red}Error: Docker compose file not exists ${RCol}\r"
+        exit 0
+    fi
+}
+
 case "$PARAM_1" in
-   "container:remove")
-        echo -e "${Yel}"
-        echo "Removing all containers"
-        echo -e "${Divider}\r"
-        if [[ "${PARAM_2,,}" == "-s" || "${PARAM_2,,}" == "s" ]]
-        then
-            docker-compose down
-        else
-            docker stop $(docker ps -a -q)
-            docker rm $(docker ps -a -q)
-        fi
-        # Remove with filters
-        # docker rm $(docker ps -a -f status=exited -f status=created)
-        echo -e "${RCol}"
-   ;;
    "container:init")
         echo -e "${Gre}"
         echo "Initializing containers"
         echo -e "${Divider}\r"
         if [[ "${PARAM_2,,}" == "-s" || "${PARAM_2,,}" == "s" ]]
         then
+            dockerComposeExist
             docker-compose up -d
         else
             eval "${DOCKIFY_FOLDER}/./container"
@@ -51,12 +48,17 @@ case "$PARAM_1" in
         echo "Starting ${PARAM_2}"
         echo -e "${Divider}\r"
 
-        if [[ "${PARAM_3,,}" == "-s" || "${PARAM_3,,}" == "s" ]]
-            then
+        if [[ "${PARAM_3,,}" == "-s" || "${PARAM_3,,}" == "s" || "${PARAM_3,,}" == "solo" ]]
+        then
             docker start $PARAM_2
+        elif [[ "${PARAM_3,,}" == "-a" || "${PARAM_3,,}" == "a" || "${PARAM_3,,}" == "all" ]]
+        then
+            dockerComposeExist
+            docker-compose up -d
         else
             cd $DOCKIFY_PROJECT_FOLDER
-            eval "docker-compose up -d $PARAM_2"
+            dockerComposeExist
+            docker-compose up -d ${PARAM_2}
         fi
         echo -e "${RCol}"
    ;;
@@ -72,7 +74,8 @@ case "$PARAM_1" in
             docker stop $PARAM_2
         else
             cd $DOCKIFY_PROJECT_FOLDER
-            eval "docker-compose stop $PARAM_2"
+            dockerComposeExist
+            docker-compose stop ${PARAM_2}
         fi
         echo -e "${RCol}"
    ;;
@@ -89,22 +92,37 @@ case "$PARAM_1" in
         exit 1
    ;;
    "container:remove")
-       echo -e "${Yel}"
-       echo "Removing container"
-       echo -e "${Divider}"
-       docker container ls -a
-       echo -e ${RCol}
-       echo -e "${Gre}Which one? :  ${RCol}\r"
-       read CONTAINER_NAME
-       docker container stop $CONTAINER_NAME
-       docker container rm $CONTAINER_NAME
+        echo -e "${Yel}"
+        echo "Removing container"
+        echo -e "${Divider}"
+
+        if [[ "${PARAM_2,,}" == "" || "${PARAM_2,,}" == "" ]]
+        then
+            dockerComposeExist
+            docker-compose down
+        elif [[ "${PARAM_2,,}" == "-o" || "${PARAM_2,,}" == "o" ]]
+        then
+            docker container ls -a
+            echo -e ${RCol}
+            echo -e "${Gre}Which one? :  ${RCol}\r"
+            read CONTAINER_NAME
+            docker container stop $CONTAINER_NAME
+            docker container rm $CONTAINER_NAME
+        elif [[ "${PARAM_2,,}" == "-a" || "${PARAM_2,,}" == "a" ]]
+        then
+            docker stop $(docker ps -a -q)
+            docker rm $(docker ps -a -q)
+        else
+            echo "Need more params"
+        fi
    ;;
-   "images:remove")
+   "image:remove")
         echo -e "${Yel}"
         echo "Removing all images"
         echo -e "${Divider}"
         if [[ "${PARAM_2,,}" == "-a" || "${PARAM_2,,}" == "a" ]]
         then
+            dockerComposeExist
             docker-compose down --rmi local
         elif [[ "${PARAM_2,,}" == "-o" || "${PARAM_2,,}" == "o" ]]
         then
@@ -113,6 +131,7 @@ case "$PARAM_1" in
             read IMAGE_NAME
             docker image rm ${IMAGE_NAME}
         else
+            dockerComposeExist
             docker-compose up -d
             # Stop all containers
             docker stop $(docker ps -a -q)
@@ -130,10 +149,12 @@ case "$PARAM_1" in
 
        if [[ "${PARAM_2,,}" == "-s" || "${PARAM_2,,}" == "s" || "${PARAM_2,,}" == "solo" ]]
        then
+            dockerComposeExist
             docker-compose up -d
        elif [[ "${PARAM_3,,}" == "-0" || "${PARAM_3,,}" == "0" || "${PARAM_3,,}" == "one" ]]
        then
-            eval "docker-compose up -d ${PARAM_2}"
+            dockerComposeExist
+            docker-compose up -d ${PARAM_2}
        else
             eval "${DOCKIFY_FOLDER}/./container"
        fi
@@ -165,19 +186,25 @@ case "$PARAM_1" in
        echo -e "${Divider}\r"
        echo -e "${Yel}"
        echo -e "COMMAND\t\t\t\tDESCRIPTION\n"
-       echo -e "containers:stop\t\t\tStop all containers\r"
-       echo -e "containers:remove\t\tStop and remove all containers\r"
-       echo -e "containers:init\t\t\tInitialize all containers\r"
+       echo -e "container:remove\t\tStop and remove all containers\r"
+       echo -e "container:init\t\t\tInitialize all containers\r"
        echo -e "container:start\t\t\tStart one container by name\r"
        echo -e "container:stop\t\t\tStop container by name\r"
        echo -e "images:remove\t\t\tRemove all images\r"
        echo -e "images:pull\t\t\tPull all images from dockerhub and registry gitlab\r"
+       echo -e "network:list\r"
+       echo -e "network:create\r"
+       echo -e "network:remove\r"
+       echo -e "volume:list\r"
+       echo -e "volume:create\r"
+       echo -e "volume:remove\r"
+       echo -e "login\r"
        echo -e "${RCol}"
    ;;
    "check-install")
         echo "Installation successfull, good work"
    ;;
-   "network")
+   "network:list")
         docker network ls
    ;;
    "network:create")
@@ -185,14 +212,16 @@ case "$PARAM_1" in
         echo "Creating network"
         echo -e "${Divider}"
         docker network create $PARAM_2
+        echo -e "${RCol}"
    ;;
    "network:remove")
         echo -e "${Yel}"
         echo "Creating network"
         echo -e "${Divider}"
         docker network rm $PARAM_2
+        echo -e "${RCol}"
    ;;
-   "volume")
+   "volume:list")
         docker volume ls
    ;;
    "volume:create")
@@ -200,6 +229,7 @@ case "$PARAM_1" in
         echo "Creating volumen"
         echo -e "${Divider}"
         docker volume create --name=$PARAM_2
+        echo -e "${RCol}"
    ;;
    "volume:remove")
         echo -e "${Yel}"
@@ -216,6 +246,19 @@ case "$PARAM_1" in
             echo -e "\e[7mYou must set a valid volume, these are available\e[0m"
             docker volume ls -q
         fi
+        echo -e "${RCol}"
+   ;;
+   "login")
+        DOCKER_USERNAME=""
+        DOCKER_PASSWORD=""
+         echo -e "${Gre}Username:  ${RCol}: ${Yel}"
+         read USERNAME
+         echo -e "${RCol}"
+         echo -e "${Gre}Password:  ${RCol}: ${Yel}"
+         read DOCKER_PASSWORD
+         echo -e "${RCol}"
+         echo -e "${Gre}Log in Docker  ${RCol}\r"
+         docker login --username=${DOCKER_USERNAME} --password=${DOCKER_PASSWORD}
    ;;
    *)
     echo "${Red}"
