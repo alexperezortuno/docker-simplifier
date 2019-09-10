@@ -4,9 +4,10 @@ PARAM_1=$1
 PARAM_2=$2
 PARAM_3=$3
 PARAM_4=$4
-SOLO=0
+LOCAL=0
 ONE=0
 ALL=0
+PROJECT=0
 CONTAINER_NAME=""
 CONTAINER_IMAGE=""
 CONTAINER_PORT="83:83"
@@ -19,6 +20,7 @@ Red='\e[031m'
 Gre='\e[032m'
 Divider='=============================================================='
 
+QUESTION=""
 QUESTION_SET_FOLDER=""
 SET_DOCKIFY_PROJECT_FOLDER=""
 
@@ -35,9 +37,9 @@ function dockerComposeExist() {
 function getParams() {
   for var in "$@"
   do
-      if [[ "${var,,}" == "-s" || "${var,,}" == "--solo" || "${var,,}" == "solo" ]]
+      if [[ "${var,,}" == "-l" || "${var,,}" == "--local" || "${var,,}" == "local" ]]
       then
-        SOLO=1
+        LOCAL=1
       elif [[ "${var,,}" == "-o" || "${var,,}" == "--one" || "${var,,}" == "one" ]]
       then
         ONE=1
@@ -50,6 +52,9 @@ function getParams() {
       elif [[ "${var,,}" == "no" || "${var,,}" == "no" ]]
       then
         NO=1
+      elif [[ "${var,,}" == "-p" || "${var,,}" == "--project" || "${var,,}" == "project" ]]
+      then
+        PROJECT=1
       fi
   done
 }
@@ -62,7 +67,7 @@ case "$PARAM_1" in
 
         getParams "$@"
 
-        if [[ "${SOLO}" == 1 ]]
+        if [[ "${LOCAL}" == 1 ]]
         then
             dockerComposeExist
             docker-compose up -d
@@ -76,7 +81,7 @@ case "$PARAM_1" in
         echo "Starting ${PARAM_2}"
         echo -e "${Divider}\r"
 
-        if [[ "${SOLO}" == 1 ]]
+        if [[ "${LOCAL}" == 1 ]]
         then
             docker start $PARAM_2
         elif [[ "${ALL}" == 1 ]]
@@ -100,7 +105,7 @@ case "$PARAM_1" in
         if [[ "${ALL}" == 1 ]]
         then
             docker stop $(docker ps -a -q)
-        elif [[ "${SOLO}" == 1 ]]
+        elif [[ "${LOCAL}" == 1 ]]
         then
             docker stop $PARAM_2
         else
@@ -129,7 +134,7 @@ case "$PARAM_1" in
 
         getParams "$@"
 
-        if [[ "${SOLO}" == 1 ]]
+        if [[ "${LOCAL}" == 1 ]]
         then
             dockerComposeExist
             docker-compose down
@@ -149,6 +154,18 @@ case "$PARAM_1" in
             echo "Need more params"
         fi
    ;;
+   "image:list")
+        getParams "$@"
+
+        dockerComposeExist
+        if [[ "${LOCAL}" == 1 ]]
+        then
+            docker-compose config --services
+        elif [[ "${ALL}" == 1 ]]
+        then
+            docker image list
+        fi
+   ;;
    "image:remove")
         echo -e "${Yel}"
         echo "Removing all images"
@@ -156,7 +173,7 @@ case "$PARAM_1" in
 
         getParams "$@"
 
-        if [[ "${ALL}" == 1 ]]
+        if [[ "${LOCAL}" == 1 ]]
         then
             dockerComposeExist
             docker-compose down --rmi local
@@ -166,9 +183,9 @@ case "$PARAM_1" in
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read IMAGE_NAME
             docker image rm ${IMAGE_NAME}
-        else
+         elif [[ "${ALL}" == 1 ]]
+         then
             dockerComposeExist
-            docker-compose up -d
             # Stop all containers
             docker stop $(docker ps -a -q)
             # Remove all containers
@@ -178,22 +195,28 @@ case "$PARAM_1" in
         fi
         echo -e "${RCol}"
    ;;
-   "images:pull")
+   "image:pull")
        echo -e "${Yel}"
        echo "Pulling images"
        echo -e "${Divider}"
 
        getParams "$@"
 
-       if [[ "${SOLO}" == 1 ]]
+       if [[ "${LOCAL}" == 1 ]]
        then
             dockerComposeExist
             docker-compose up -d
        elif [[ "${ONE}" == 1 ]]
        then
             dockerComposeExist
-            docker-compose up -d ${PARAM_2}
-       else
+            echo -e "${Yel}"
+            docker-compose config --services
+            echo -e " ${RCol}\r"
+            echo -e "${Gre}Which one? :  ${RCol}\r"
+            read QUESTION
+            docker-compose up -d ${QUESTION}
+       elif [[ "${PROJECT}" == 1 ]]
+       then
             eval "${DOCKIFY_FOLDER}/./container"
        fi
        echo -e "${RCol}"
