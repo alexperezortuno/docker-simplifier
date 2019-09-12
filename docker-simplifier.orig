@@ -30,7 +30,9 @@ function dockerComposeExist() {
     else
         DOCKER_COMPOSE_FILE_EXIST=0
         echo -e "${Red}Error: Docker compose file not exists ${RCol}\r"
+<<<<<<< HEAD
         exit 1
+=======
     fi
 }
 
@@ -43,6 +45,7 @@ function dockerFileExist() {
         echo 1
     else
         echo 0
+>>>>>>> feature/add-new-options
     fi
 }
 
@@ -83,6 +86,7 @@ case "$PARAM_1" in
         then
             dockerComposeExist
             docker-compose up -d
+<<<<<<< HEAD
         elif [[ "${ONE}" == 1 ]]
         then
             dockerComposeExist
@@ -97,6 +101,11 @@ case "$PARAM_1" in
             docker-compose up -d ${CONTAINER_NAME}
         elif [[ "${PROJECT}" == 1 ]]
         then
+            cd $DOCKIFY_PROJECT_FOLDER
+=======
+        elif [[ "${PROJECT}" == 1 ]]
+        then
+>>>>>>> feature/add-new-options
             eval "${DOCKIFY_FOLDER}/./container"
         fi
         echo -e "${RCol}"
@@ -104,9 +113,13 @@ case "$PARAM_1" in
    "container:start")
         echo -e "${Yel}"
         echo "Starting ${PARAM_2}"
+<<<<<<< HEAD
         echo -e "${Divider}${RCol}"
+=======
+        echo -e "${Divider}${RCol}\r"
 
         getParams "$@"
+>>>>>>> feature/add-new-options
 
         if [[ "${LOCAL}" == 1 ]]
         then
@@ -117,22 +130,32 @@ case "$PARAM_1" in
             docker-compose up -d
         elif [[ "${ONE}" == 1 ]]
         then
+<<<<<<< HEAD
             dockerComposeExist
-            docker-compose config --services
+            docker container ls -a
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read CONTAINER_NAME
             docker-compose up -d ${CONTAINER_NAME}
         elif [[ "${PROJECT}" == 1 ]]
         then
             cd $DOCKIFY_PROJECT_FOLDER
+=======
+>>>>>>> feature/add-new-options
             dockerComposeExist
+            docker-compose config --services
+            echo -e "${Gre}Which one? :  ${RCol}\r"
             docker-compose up -d ${PARAM_2}
         fi
    ;;
    "container:stop")
         echo -e "${Yel}"
+<<<<<<< HEAD
         echo "Stop container"
         echo -e "${Divider}${RCol}"
+=======
+        echo "Stopping ${PARAM_2}"
+        echo -e "${Divider}${RCol}\r"
+>>>>>>> feature/add-new-options
 
         getParams "$@"
 
@@ -144,6 +167,7 @@ case "$PARAM_1" in
             docker stop $PARAM_2
         elif [[ "${ONE}" == 1 ]]
         then
+<<<<<<< HEAD
             dockerComposeExist
             echo -e "${Yel}Containers running${RCol}\r"
             echo -e "${Yel}${Divider}${RCol}"
@@ -157,7 +181,11 @@ case "$PARAM_1" in
         elif [[ "${PROJECT}" == 1 ]]
         then
             cd $DOCKIFY_PROJECT_FOLDER
+=======
+>>>>>>> feature/add-new-options
             dockerComposeExist
+            docker-compose config --services
+            echo -e "${Gre}Which one? :  ${RCol}\r"
             docker-compose stop ${PARAM_2}
         fi
    ;;
@@ -173,8 +201,12 @@ case "$PARAM_1" in
         echo -e "${Gre} Process finish  ${RCol}\r"
    ;;
    "container:remove")
+<<<<<<< HEAD
+        echo -e "${Yel}Removing container${RCol}"
+=======
         echo -e "${Yel}"
         echo "Removing container"
+>>>>>>> feature/add-new-options
         echo -e "${Divider}${RCol}"
 
         getParams "$@"
@@ -199,6 +231,18 @@ case "$PARAM_1" in
             echo "Need more params"
         fi
    ;;
+<<<<<<< HEAD
+   "container:list")
+        getParams "$@"
+
+        dockerComposeExist
+        if [[ "${LOCAL}" == 1 ]]
+        then
+            docker-compose config --services
+        elif [[ "${ALL}" == 1 ]]
+        then
+            docker container list -a
+=======
    "image:build")
         echo -e "${Yel}"
         echo "Build image ${PARAM_2}"
@@ -210,18 +254,7 @@ case "$PARAM_1" in
           echo -e "${Gre}Tag for image :  ${RCol}\r"
           read IMAGE_NAME
           docker build -t "${IMAGE_NAME}" .
-        fi
-   ;;
-   "container:list")
-        getParams "$@"
-
-        dockerComposeExist
-        if [[ "${LOCAL}" == 1 ]]
-        then
-            docker-compose config --services
-        elif [[ "${ALL}" == 1 ]]
-        then
-            docker container list -a
+>>>>>>> feature/add-new-options
         fi
    ;;
    "image:list")
@@ -233,7 +266,7 @@ case "$PARAM_1" in
             docker-compose config --services
         elif [[ "${ALL}" == 1 ]]
         then
-            docker image list
+            docker image list -a
         fi
    ;;
    "image:remove")
@@ -410,5 +443,3 @@ case "$PARAM_1" in
     echo -e "${Red}I don't know what to do${RCol}"
     ;;
 esac
-
-exit 1
