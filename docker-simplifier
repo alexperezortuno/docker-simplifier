@@ -75,11 +75,11 @@ case "$PARAM_1" in
    "container:init")
         echo -e "${Gre}"
         echo "Initializing container"
-        echo -e "${Divider}\r"
+        echo -e "${Divider}${RCol}"
 
         getParams "$@"
 
-        if [[ "${LOCAL}" == 1 ]]
+        if [[ "${ALL}" == 1 ]]
         then
             dockerComposeExist
             docker-compose up -d
@@ -97,36 +97,9 @@ case "$PARAM_1" in
             docker-compose up -d ${CONTAINER_NAME}
         elif [[ "${PROJECT}" == 1 ]]
         then
-            eval "${DOCKIFY_FOLDER}/./container"
-        fi
-        echo -e "${RCol}"
-   ;;
-   "container:start")
-        echo -e "${Yel}"
-        echo "Starting ${PARAM_2}"
-        echo -e "${Divider}${RCol}"
-
-        getParams "$@"
-
-        if [[ "${LOCAL}" == 1 ]]
-        then
-            docker start $PARAM_2
-        elif [[ "${ALL}" == 1 ]]
-        then
-            dockerComposeExist
-            docker-compose up -d
-        elif [[ "${ONE}" == 1 ]]
-        then
-            dockerComposeExist
-            docker-compose config --services
-            echo -e "${Gre}Which one? :  ${RCol}\r"
-            read CONTAINER_NAME
-            docker-compose up -d ${CONTAINER_NAME}
-        elif [[ "${PROJECT}" == 1 ]]
-        then
             cd $DOCKIFY_PROJECT_FOLDER
             dockerComposeExist
-            docker-compose up -d ${PARAM_2}
+            eval "${DOCKIFY_FOLDER}/./container"
         fi
    ;;
    "container:stop")
@@ -193,7 +166,7 @@ case "$PARAM_1" in
             docker container rm -f "${CONTAINER_NAME}"
         elif [[ "${ALL}" == 1 ]]
         then
-            docker stop $(docker ps -a -q)
+            docker stop $(docker y imaps -a -q)
             docker rm $(docker ps -a -q)
         else
             echo "Need more params"
@@ -288,14 +261,13 @@ case "$PARAM_1" in
        elif [[ "${ONE}" == 1 ]]
        then
             dockerComposeExist
-            echo -e "${Yel}"
-            docker-compose config --services
-            echo -e " ${RCol}\r"
-            echo -e "${Gre}Which one? :  ${RCol}\r"
+            echo -e "${Gre}Which? :  ${RCol}\r"
             read QUESTION
-            docker-compose up -d ${QUESTION}
+            docker pull ${QUESTION}
        elif [[ "${PROJECT}" == 1 ]]
        then
+            cd $DOCKIFY_PROJECT_FOLDER
+            dockerComposeExist
             eval "${DOCKIFY_FOLDER}/./container"
        fi
    ;;
