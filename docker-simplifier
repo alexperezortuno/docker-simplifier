@@ -30,7 +30,18 @@ function dockerComposeExist() {
     else
         DOCKER_COMPOSE_FILE_EXIST=0
         echo -e "${Red}Error: Docker compose file not exists ${RCol}\r"
-        exit 0
+    fi
+}
+
+function dockerFileExist() {
+    local __resultvar=$1
+    local FILE="`pwd`/Dockerfile"
+
+    if [[ -f "$FILE" ]]
+    then
+        echo 1
+    else
+        echo 0
     fi
 }
 
@@ -71,7 +82,8 @@ case "$PARAM_1" in
         then
             dockerComposeExist
             docker-compose up -d
-        else
+        elif [[ "${PROJECT}" == 1 ]]
+        then
             eval "${DOCKIFY_FOLDER}/./container"
         fi
         echo -e "${RCol}"
@@ -79,7 +91,9 @@ case "$PARAM_1" in
    "container:start")
         echo -e "${Yel}"
         echo "Starting ${PARAM_2}"
-        echo -e "${Divider}\r"
+        echo -e "${Divider}${RCol}\r"
+
+        getParams "$@"
 
         if [[ "${LOCAL}" == 1 ]]
         then
@@ -88,9 +102,11 @@ case "$PARAM_1" in
         then
             dockerComposeExist
             docker-compose up -d
-        else
-            cd $DOCKIFY_PROJECT_FOLDER
+        elif [[ "${ONE}" == 1 ]]
+        then
             dockerComposeExist
+            docker-compose config --services
+            echo -e "${Gre}Which one? :  ${RCol}\r"
             docker-compose up -d ${PARAM_2}
         fi
         echo -e "${RCol}"
@@ -98,7 +114,7 @@ case "$PARAM_1" in
    "container:stop")
         echo -e "${Yel}"
         echo "Stopping ${PARAM_2}"
-        echo -e "${Divider}\r"
+        echo -e "${Divider}${RCol}\r"
 
         getParams "$@"
 
@@ -108,9 +124,11 @@ case "$PARAM_1" in
         elif [[ "${LOCAL}" == 1 ]]
         then
             docker stop $PARAM_2
-        else
-            cd $DOCKIFY_PROJECT_FOLDER
+        elif [[ "${ONE}" == 1 ]]
+        then
             dockerComposeExist
+            docker-compose config --services
+            echo -e "${Gre}Which one? :  ${RCol}\r"
             docker-compose stop ${PARAM_2}
         fi
         echo -e "${RCol}"
@@ -125,12 +143,11 @@ case "$PARAM_1" in
         echo -e "${Yel}Starting process, please wait to finish ${Divider}${RCol}\r"
         docker run -d --name=${CONTAINER_NAME} -p ${CONTAINER_PORT} ${CONTAINER_IMAGE}
         echo -e "${Gre} Process finish  ${RCol}\r"
-        exit 1
    ;;
    "container:remove")
         echo -e "${Yel}"
         echo "Removing container"
-        echo -e "${Divider}"
+        echo -e "${Divider}${RCol}"
 
         getParams "$@"
 
@@ -141,7 +158,6 @@ case "$PARAM_1" in
         elif [[ "${ONE}" == 1 ]]
         then
             docker container ls -a
-            echo -e ${RCol}
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read CONTAINER_NAME
             docker container stop $CONTAINER_NAME
@@ -152,6 +168,19 @@ case "$PARAM_1" in
             docker rm $(docker ps -a -q)
         else
             echo "Need more params"
+        fi
+   ;;
+   "image:build")
+        echo -e "${Yel}"
+        echo "Build image ${PARAM_2}"
+        echo -e "${Divider}${RCol}\r"
+        CHECK=$(dockerFileExist)
+
+        if [[ "${CHECK}" == 1 ]]
+        then
+          echo -e "${Gre}Tag for image :  ${RCol}\r"
+          read IMAGE_NAME
+          docker build -t "${IMAGE_NAME}" .
         fi
    ;;
    "image:list")
@@ -195,10 +224,19 @@ case "$PARAM_1" in
         fi
         echo -e "${RCol}"
    ;;
+   "image:push")
+       echo -e "${Yel}"
+       echo "Pushing images"
+       echo -e "${Divider}${RCol}"
+       docker images
+       echo -e "${Gre}Which one? :  ${RCol}\r"
+       read IMAGE_NAME
+       docker push ${IMAGE_NAME}
+   ;;
    "image:pull")
        echo -e "${Yel}"
        echo "Pulling images"
-       echo -e "${Divider}"
+       echo -e "${Divider}${RCol}"
 
        getParams "$@"
 
@@ -334,5 +372,3 @@ case "$PARAM_1" in
     echo "${RCol}"
     ;;
 esac
-
-exit 1
