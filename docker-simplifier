@@ -374,6 +374,23 @@ case "$PARAM_1" in
          echo -e "${Gre}Log in Docker  ${RCol}\r"
          docker login --username=${DOCKER_USERNAME} --password=${DOCKER_PASSWORD}
    ;;
+   "clean")
+        docker system prune
+   ;;
+   "terminal")
+        echo -e "${Yel}"
+        echo "Containers running"
+        echo -e "${Divider}${RCol}"
+        docker ps
+        echo -e "${Gre}Which one? :  ${RCol}\r"
+        read QUESTION
+        if [[ "${QUESTION}" == "" ]]
+        then
+            echo -e "${Red}You need set a valid container ID  ${RCol}\r"
+            exit 2
+        fi
+        docker exec -it "${QUESTION}" bash
+   ;;
   "params")
     getParams "$@"
     echo $SOLO
