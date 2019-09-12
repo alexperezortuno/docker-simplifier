@@ -74,9 +74,11 @@ case "$PARAM_1" in
         elif [[ "${ONE}" == 1 ]]
         then
             dockerComposeExist
-            echo -e "${Yel}Containers running \r${Divider}\r${RCol}"
-            docker container ls -a
-            echo -e "${Yel}Available containers \r${Divider}\r${RCol}"
+            echo -e "${Yel}Containers running${RCol}\r"
+            echo -e "${Yel}${Divider}${RCol}"
+            docker container ls
+            echo -e "${Yel}Available containers${RCol}\r"
+            echo -e "${Yel}${Divider}${RCol}"
             docker-compose config --services
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read CONTAINER_NAME
@@ -245,7 +247,7 @@ case "$PARAM_1" in
 
        getParams "$@"
 
-       if [[ "${LOCAL}" == 1 ]]
+       if [[ "${ALL}" == 1 ]]
        then
             dockerComposeExist
             docker-compose up -d
