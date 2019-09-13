@@ -199,6 +199,18 @@ case "$PARAM_1" in
             echo "Need more params"
         fi
    ;;
+   "container:list")
+        getParams "$@"
+
+        dockerComposeExist
+        if [[ "${LOCAL}" == 1 ]]
+        then
+            docker-compose config --services
+        elif [[ "${ALL}" == 1 ]]
+        then
+            docker container list -a
+        fi
+   ;;
    "image:build")
         echo -e "${Yel}"
         echo "Build image ${PARAM_2}"
@@ -210,18 +222,6 @@ case "$PARAM_1" in
           echo -e "${Gre}Tag for image :  ${RCol}\r"
           read IMAGE_NAME
           docker build -t "${IMAGE_NAME}" .
-        fi
-   ;;
-   "container:list")
-        getParams "$@"
-
-        dockerComposeExist
-        if [[ "${LOCAL}" == 1 ]]
-        then
-            docker-compose config --services
-        elif [[ "${ALL}" == 1 ]]
-        then
-            docker container list -a
         fi
    ;;
    "image:list")
