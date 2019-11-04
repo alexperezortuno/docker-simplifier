@@ -8,6 +8,8 @@ LOCAL=0
 ONE=0
 ALL=0
 PROJECT=0
+TIME="time"
+ID="id"
 CONTAINER_NAME=""
 CONTAINER_IMAGE=""
 CONTAINER_PORT="83:83"
@@ -104,7 +106,7 @@ case "$PARAM_1" in
    ;;
    "container:stop")
         echo -e "${Yel}"
-        echo "Stop container"
+        echo "Stop container all container"
         echo -e "${Divider}${RCol}"
 
         getParams "$@"
@@ -133,6 +135,20 @@ case "$PARAM_1" in
             dockerComposeExist
             docker-compose stop ${PARAM_2}
         fi
+   ;;
+   "container:logs")
+        if [[ "${PROJECT}" == 1 ]]
+        then
+            cd $DOCKIFY_PROJECT_FOLDER
+        fi
+
+        dockerComposeExist
+        echo -e "${Yel}Containers running${RCol}\r"
+        echo -e "${Yel}${Divider}${RCol}"
+        docker container ls
+        echo -e "${Gre}Which one? :  ${RCol}\r"
+        read CONTAINER_NAME
+        docker logs -f ${CONTAINER_NAME}
    ;;
    "container:create")
         echo -e "${Yel}Please write a name for the container :  ${RCol}\r"
@@ -293,17 +309,23 @@ case "$PARAM_1" in
    ;;
    "list")
        echo -e "${Gre}"
-       echo -e "Docker Simplifier\r"
-       echo -e "${RCol}"
-       echo -e "${Divider}\r"
+       echo -e "Docker Simplifier${RCol}\r"
+       echo -e "${Divider}${RCol}\r"
        echo -e "${Yel}"
        echo -e "COMMAND\t\t\t\tDESCRIPTION\n"
-       echo -e "container:remove\t\tStop and remove all containers\r"
+       echo -e "container:create\r"
        echo -e "container:init\t\t\tInitialize all containers\r"
+       echo -e "container:list\r"
+       echo -e "container:log\r"
+       echo -e "container:remove\t\tStop and remove all containers\r"
        echo -e "container:start\t\t\tStart one container by name\r"
        echo -e "container:stop\t\t\tStop container by name\r"
-       echo -e "images:remove\t\t\tRemove all images\r"
-       echo -e "images:pull\t\t\tPull all images from dockerhub and registry gitlab\r"
+       echo -e "image:build\r"
+       echo -e "image:remove\t\t\tRemove all images\r"
+       echo -e "image:list\r"
+       echo -e "image:push\r"
+       echo -e "image:pull\t\t\tPull all images from dockerhub and registry gitlab\r"
+       echo -e "project:folder:set\r"
        echo -e "network:list\r"
        echo -e "network:create\r"
        echo -e "network:remove\r"
@@ -311,6 +333,8 @@ case "$PARAM_1" in
        echo -e "volume:create\r"
        echo -e "volume:remove\r"
        echo -e "login\r"
+       echo -e "clean\r"
+       echo -e "terminal\r"
        echo -e "${RCol}"
    ;;
    "check-install")
@@ -384,6 +408,7 @@ case "$PARAM_1" in
         docker ps
         echo -e "${Gre}Which one? :  ${RCol}\r"
         read QUESTION
+
         if [[ "${QUESTION}" == "" ]]
         then
             echo -e "${Red}You need set a valid container ID  ${RCol}\r"
