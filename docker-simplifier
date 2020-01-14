@@ -366,10 +366,10 @@ case "$PARAM_1" in
             then
                 dockerComposeExist
             fi
-
+            docker-compose ${filename} config --services
             echo -e "${Gre}Which? :  ${RCol}\r"
             read QUESTION
-            docker pull ${QUESTION}
+            docker-compose pull ${QUESTION}
        elif [[ "${PROJECT}" == 1 ]]
        then
             cd $DOCKIFY_PROJECT_FOLDER
