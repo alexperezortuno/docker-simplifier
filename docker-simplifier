@@ -10,6 +10,7 @@ ALL=0
 PROJECT=0
 TIME="time"
 ID="id"
+filename=""
 CONTAINER_NAME=""
 CONTAINER_IMAGE=""
 CONTAINER_PORT="83:83"
@@ -48,29 +49,64 @@ function dockerFileExist() {
     fi
 }
 
-function getParams() {
-  for var in "$@"
-  do
-      if [[ "${var,,}" == "-l" || "${var,,}" == "--local" || "${var,,}" == "local" ]]
-      then
-        LOCAL=1
-      elif [[ "${var,,}" == "-o" || "${var,,}" == "--one" || "${var,,}" == "one" ]]
-      then
-        ONE=1
-      elif [[ "${var,,}" == "-a" || "${var,,}" == "--all" || "${var,,}" == "all" ]]
-      then
-        ALL=1
-      elif [[ "${var,,}" == "y" || "${var,,}" == "yes" ]]
-      then
-        YES=1
-      elif [[ "${var,,}" == "no" || "${var,,}" == "no" ]]
-      then
-        NO=1
-      elif [[ "${var,,}" == "-p" || "${var,,}" == "--project" || "${var,,}" == "project" ]]
-      then
-        PROJECT=1
-      fi
-  done
+usage() {
+    echo -e "${Gre}"
+       echo -e "Docker Simplifier${RCol}\r"
+       echo -e "${Divider}${RCol}\r"
+       echo -e "${Yel}"
+       echo -e "COMMAND\t\t\t\tDESCRIPTION\n"
+       echo -e "container:create\r"
+       echo -e "container:init\t\t\tInitialize all containers\r"
+       echo -e "container:list\r"
+       echo -e "container:log\r"
+       echo -e "container:remove\t\tStop and remove all containers\r"
+       echo -e "container:start\t\t\tStart one container by name\r"
+       echo -e "container:stop\t\t\tStop container by name\r"
+       echo -e "image:build\r"
+       echo -e "image:remove\t\t\tRemove all images\r"
+       echo -e "image:list\r"
+       echo -e "image:push\r"
+       echo -e "image:pull\t\t\tPull all images from dockerhub and registry gitlab\r"
+       echo -e "project:folder:set\r"
+       echo -e "network:list\r"
+       echo -e "network:create\r"
+       echo -e "network:remove\r"
+       echo -e "volume:list\r"
+       echo -e "volume:create\r"
+       echo -e "volume:remove\r"
+       echo -e "login\r"
+       echo -e "clean\r"
+       echo -e "terminal\r"
+       echo -e "${RCol}"
+}
+
+getParams() {
+    for var in "$@"
+    do
+        case "${var,,}" in
+            -f | --file )   shift
+                            FILE=1
+                            filename=" -f ${1} "
+            ;;
+            -l | --local ) LOCAL=1
+            ;;
+            -o | --one ) ONE=1
+            ;;
+            -a | --all ) ALL=1
+            ;;
+            -y | --yes ) YES=1
+            ;;
+            -n | --no ) NO=1
+            ;;
+            -p | --project ) PROJECT=1
+             ;;
+            -h | --help ) usage
+                exit
+            ;;
+            * )
+        esac
+        shift
+    done
 }
 
 case "$PARAM_1" in
@@ -84,7 +120,7 @@ case "$PARAM_1" in
         if [[ "${ALL}" == 1 ]]
         then
             dockerComposeExist
-            docker-compose up -d
+            docker-compose ${filename} up -d
         elif [[ "${ONE}" == 1 ]]
         then
             dockerComposeExist
@@ -96,7 +132,7 @@ case "$PARAM_1" in
             docker-compose config --services
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read CONTAINER_NAME
-            docker-compose up -d ${CONTAINER_NAME}
+            docker-compose ${filename} up -d ${CONTAINER_NAME}
         elif [[ "${PROJECT}" == 1 ]]
         then
             cd $DOCKIFY_PROJECT_FOLDER
@@ -113,7 +149,7 @@ case "$PARAM_1" in
 
         if [[ "${ALL}" == 1 ]]
         then
-            docker stop $(docker ps -a -q)
+            docker ${filename} stop $(docker ps -a -q)
         elif [[ "${LOCAL}" == 1 ]]
         then
             docker stop $PARAM_2
@@ -128,12 +164,12 @@ case "$PARAM_1" in
             docker-compose config --services
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read CONTAINER_NAME
-            docker-compose stop ${CONTAINER_NAME}
+            docker-compose ${filename} stop ${CONTAINER_NAME}
         elif [[ "${PROJECT}" == 1 ]]
         then
             cd $DOCKIFY_PROJECT_FOLDER
             dockerComposeExist
-            docker-compose stop ${PARAM_2}
+            docker-compose ${filename} stop ${PARAM_2}
         fi
    ;;
    "container:logs")
@@ -171,7 +207,7 @@ case "$PARAM_1" in
         if [[ "${LOCAL}" == 1 ]]
         then
             dockerComposeExist
-            docker-compose down
+            docker-compose ${filename} down
         elif [[ "${ONE}" == 1 ]]
         then
             dockerComposeExist
@@ -194,7 +230,7 @@ case "$PARAM_1" in
         dockerComposeExist
         if [[ "${LOCAL}" == 1 ]]
         then
-            docker-compose config --services
+            docker-compose ${filename} config --services
         elif [[ "${ALL}" == 1 ]]
         then
             docker container list -a
@@ -219,7 +255,7 @@ case "$PARAM_1" in
         dockerComposeExist
         if [[ "${LOCAL}" == 1 ]]
         then
-            docker-compose config --services
+            docker-compose ${filename} config --services
         elif [[ "${ALL}" == 1 ]]
         then
             docker image list
@@ -235,7 +271,7 @@ case "$PARAM_1" in
         if [[ "${LOCAL}" == 1 ]]
         then
             dockerComposeExist
-            docker-compose down --rmi local
+            docker-compose ${filename} down --rmi local
         elif [[ "${ONE}" == 1 ]]
         then
             docker image ls
@@ -273,7 +309,7 @@ case "$PARAM_1" in
        if [[ "${ALL}" == 1 ]]
        then
             dockerComposeExist
-            docker-compose up -d
+            docker-compose ${filename} up -d
        elif [[ "${ONE}" == 1 ]]
        then
             dockerComposeExist
@@ -308,34 +344,7 @@ case "$PARAM_1" in
         fi
    ;;
    "list")
-       echo -e "${Gre}"
-       echo -e "Docker Simplifier${RCol}\r"
-       echo -e "${Divider}${RCol}\r"
-       echo -e "${Yel}"
-       echo -e "COMMAND\t\t\t\tDESCRIPTION\n"
-       echo -e "container:create\r"
-       echo -e "container:init\t\t\tInitialize all containers\r"
-       echo -e "container:list\r"
-       echo -e "container:log\r"
-       echo -e "container:remove\t\tStop and remove all containers\r"
-       echo -e "container:start\t\t\tStart one container by name\r"
-       echo -e "container:stop\t\t\tStop container by name\r"
-       echo -e "image:build\r"
-       echo -e "image:remove\t\t\tRemove all images\r"
-       echo -e "image:list\r"
-       echo -e "image:push\r"
-       echo -e "image:pull\t\t\tPull all images from dockerhub and registry gitlab\r"
-       echo -e "project:folder:set\r"
-       echo -e "network:list\r"
-       echo -e "network:create\r"
-       echo -e "network:remove\r"
-       echo -e "volume:list\r"
-       echo -e "volume:create\r"
-       echo -e "volume:remove\r"
-       echo -e "login\r"
-       echo -e "clean\r"
-       echo -e "terminal\r"
-       echo -e "${RCol}"
+       usage
    ;;
    "check-install")
         echo "Installation successfull, good work"
