@@ -138,7 +138,7 @@ case "$PARAM_1" in
             docker container ls
             echo -e "${Yel}Available containers${RCol}\r"
             echo -e "${Yel}${Divider}${RCol}"
-            docker-compose config --services
+            docker-compose ${filename} config --services
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read CONTAINER_NAME
             docker-compose ${filename} up -d ${CONTAINER_NAME}
