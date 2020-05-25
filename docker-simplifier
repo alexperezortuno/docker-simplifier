@@ -468,6 +468,9 @@ case "$PARAM_1" in
    "clean")
         docker system prune
    ;;
+   "info")
+        docker info | grep -i root
+   ;;
    "terminal")
         echo -e "${Yel}"
         echo "Containers running"
@@ -483,9 +486,9 @@ case "$PARAM_1" in
         fi
         docker exec -it "${QUESTION}" bash
    ;;
-  "params")
-    getParams "$@"
-    echo $SOLO
+   "params")
+        getParams "$@"
+        echo $SOLO
   ;;
    *)
     echo -e "${Red}I don't know what to do${RCol}"
