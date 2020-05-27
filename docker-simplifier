@@ -76,6 +76,7 @@ usage() {
        echo -e "volume:create\t\t\tCreate a volume\r"
        echo -e "volume:remove\t\t\tRemove volume\r"
        echo -e "login\t\t\t\tLogin to repository\r"
+       echo -e "info\t\t\t\tShow grep root info\r"
        echo -e "clean\t\t\t\tPrune docker\r"
        echo -e "terminal\t\t\tOpen container terminal\r"
        echo -e "${RCol}"
@@ -286,16 +287,10 @@ case "$PARAM_1" in
    "image:list")
         getParams "$@"
 
-        if [[ "${CUSTOM_FILE}" == 0 ]]
-        then
-            dockerComposeExist
-        fi
-
         if [[ "${LOCAL}" == 1 ]]
         then
-            docker-compose ${filename} config --services
-        elif [[ "${ALL}" == 1 ]]
-        then
+            docker-compose images config --services
+        else
             docker image list
         fi
    ;;
