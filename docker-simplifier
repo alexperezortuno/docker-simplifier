@@ -16,6 +16,7 @@ CONTAINER_NAME=""
 CONTAINER_IMAGE=""
 CONTAINER_PORT="83:83"
 IMAGE_NAME=""
+COMPATIBILITY=""
 DOCKER_COMPOSE_FILE="`pwd`/docker-compose.yml"
 
 RCol='\e[0m'
@@ -105,6 +106,8 @@ getParams() {
             -h | --help ) usage
                 exit
             ;;
+            -c | --compatibility ) COMPATIBILITY="--compatibility"
+            ;;
             * )
         esac
         shift
@@ -126,7 +129,7 @@ case "$PARAM_1" in
                 dockerComposeExist
             fi
 
-            docker-compose ${filename} up -d
+            docker-compose ${filename} ${COMPATIBILITY} up -d
         elif [[ "${ONE}" == 1 ]]
         then
             if [[ "${CUSTOM_FILE}" == 0 ]]
@@ -142,7 +145,7 @@ case "$PARAM_1" in
             docker-compose ${filename} config --services
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read CONTAINER_NAME
-            docker-compose ${filename} up -d ${CONTAINER_NAME}
+            docker-compose ${filename} ${COMPATIBILITY} up -d ${CONTAINER_NAME}
         elif [[ "${PROJECT}" == 1 ]]
         then
             cd $DOCKIFY_PROJECT_FOLDER
