@@ -1,0 +1,68 @@
+#!/bin/bash
+SOURCE="$(readlink -m install)"
+FILE_LOCATION="`pwd`"
+PROJECT_FOLDER="`pwd`"
+PREFIX="/install"
+IN_FILE=$(cat ~/.bashrc | grep -c "dockify")
+PLATFORM=$OSTYPE
+DISTRO=$(cat /etc/*release | grep -c Ubuntu)
+QUESTION_FOLDER=""
+
+RCol='\e[0m';
+Yel='\e[0;33m';
+Red='\e[0;31m';
+Gre='\e[0;32m';
+Divider='==============================================================';
+
+function alias_remove() {
+    echo -e "${Yel} Removing alias ${RCol}\n"
+    sed -i 's/export DOCKIFY_FOLDER.*//g' ~/.bashrc
+    sed -i 's/export DOCKIFY_PROJECT_FOLDER.*//g' ~/.bashrc
+    sed -i 's/alias dockify.*//g' ~/.bashrc
+}
+
+function alias_installer() {
+    echo -e "${Yel} Set new alias ${RCol}\n"
+    echo "export DOCKIFY_FOLDER='${FILE_LOCATION}'" >> ~/.bashrc
+    echo "export DOCKIFY_PROJECT_FOLDER='${PROJECT_FOLDER}'" >> ~/.bashrc
+    echo "alias dockify='\$DOCKIFY_FOLDER/./docker-simplifier'" >> ~/.bashrc
+    echo -e "${Gre} Alias set successfully ${RCol}\n"
+}
+
+echo -e "${Yel} This is the path to the project docker-compose file: ${FILE_LOCATION}? [y/N]:  ${RCol}\r"
+read QUESTION_FOLDER
+QUESTION_FOLDER="${QUESTION_FOLDER,,}"
+
+if [[ ${QUESTION_FOLDER} = "n" || ${QUESTION_FOLDER} = "no" || ${QUESTION_FOLDER} = "nope" ]]
+    then
+    echo -e "${Yel} Please set the folder path to file:  ${RCol}\r"
+    read PROJECT_FOLDER
+fi
+
+if [[ ${IN_FILE} -eq 0 ]]
+  then
+    echo -e "${Gre}${Divider}${RCol}\n"
+    alias_installer
+    echo -e "${Gre}${Divider}${RCol}\n"
+else
+    echo -e "${Yel}${Divider}${RCol}\n"
+    alias_remove
+    alias_installer
+    echo -e "${Gre}Testing file${RCol}\n"
+    echo -e "${Yel}${Divider}${RCol}\n"
+fi
+
+eval "source ~/.bashrc"
+cd $FILE_LOCATION
+touch container
+touch images_to_pull
+echo "#!/bin/bash" > container
+echo "" >> container
+echo "cd \$DOCKIFY_PROJECT_FOLDER" >> container
+echo "#!/bin/bash" > images_to_pull
+echo "" >> images_to_pull
+echo "cd \$DOCKIFY_PROJECT_FOLDER" >> images_to_pull
+sudo chmod +x ${FILE_LOCATION}/container
+sudo chmod +x ${FILE_LOCATION}/docker-simplifier
+sudo ${FILE_LOCATION}/./docker-simplifier check-install
+exit 1
