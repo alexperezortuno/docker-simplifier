@@ -4,6 +4,7 @@ PARAM_1=$1
 PARAM_2=$2
 PARAM_3=$3
 PARAM_4=$4
+PATH_VAR=""
 LOCAL=0
 ONE=0
 ALL=0
@@ -15,8 +16,12 @@ filename=""
 CONTAINER_NAME=""
 CONTAINER_IMAGE=""
 CONTAINER_PORT="83:83"
+COMMAND=""
 IMAGE_NAME=""
+IMAGE_ID=""
 COMPATIBILITY=""
+FORCE=""
+TAG_NAME=0
 DOCKER_COMPOSE_FILE="`pwd`/docker-compose.yml"
 
 RCol='\e[0m'
@@ -83,6 +88,29 @@ usage() {
        echo -e "${RCol}"
 }
 
+availableCommands() {
+  echo -e "${Gre}"
+  echo -e "Available commands${RCol}\r"
+ echo -e "${Divider}${RCol}\r"
+ echo -e "${Yel}"
+  echo -e "--blkio-weight\t\tBlock IO (relative weight), between 10 and 1000, or 0 to disable (default 0)\r"
+  echo -e "--cpu-period\t\tLimit CPU CFS (Completely Fair Scheduler) period\r"
+  echo -e "--cpu-quota\t\tLimit CPU CFS (Completely Fair Scheduler) quota\r"
+  echo -e "--cpu-rt-period\t\tLimit the CPU real-time period in microseconds\r"
+  echo -e "--cpu-rt-runtime\tLimit the CPU real-time runtime in microseconds\r"
+  echo -e "--cpu-shares\t\tCPU shares (relative weight)\r"
+  echo -e "--cpus\t\t\t\tNumber of CPUs\r"
+  echo -e "--cpuset-cpus\t\tCPUs in which to allow execution (0-3, 0,1)\r"
+  echo -e "--cpuset-mems\t\tMEMs in which to allow execution (0-3, 0,1)\r"
+  echo -e "--kernel-memory\t\tKernel memory limit\r"
+  echo -e "--memory\t\t\t\tMemory limit\r"
+  echo -e "--memory-reservation\tMemory soft limit\r"
+  echo -e "--memory-swap\t\tSwap limit equal to memory plus swap: ‘-1’ to enable unlimited swap\r"
+  echo -e "--pids-limit\t\tTune container pids limit (set -1 for unlimited)\r"
+  echo -e "--restart\t\tRestart policy to apply when a container exits\r"
+  echo -e "${RCol}"
+}
+
 getParams() {
     for var in "$@"
     do
@@ -90,6 +118,10 @@ getParams() {
             -f | --file )   shift
                             CUSTOM_FILE=1
                             filename=" -f ${1} "
+            ;;
+            -t | --tag )   shift
+                            TAG_NAME=1
+                            IMAGE_NAME="${1}"
             ;;
             -l | --local ) LOCAL=1
             ;;
@@ -107,6 +139,18 @@ getParams() {
                 exit
             ;;
             -c | --compatibility ) COMPATIBILITY="--compatibility"
+            ;;
+            -i | --image-name ) shift
+                                  TAG_NAME=1
+                                  IMAGE_NAME="${1}"
+            ;;
+            --force ) COMPATIBILITY="--force"
+            ;;
+            --name ) shift
+                      CONTAINER_NAME="${1}"
+            ;;
+            --command ) shift
+                          COMMAND="${1}"
             ;;
             * )
         esac
@@ -145,7 +189,7 @@ case "$PARAM_1" in
             docker-compose ${filename} config --services
             echo -e "${Gre}Which one? :  ${RCol}\r"
             read CONTAINER_NAME
-            docker-compose ${filename} ${COMPATIBILITY} up -d ${CONTAINER_NAME}
+            docker-compose ${filename} ${COMPATIBILITY} ${FORCE} up -d ${CONTAINER_NAME}
         elif [[ "${PROJECT}" == 1 ]]
         then
             cd $DOCKIFY_PROJECT_FOLDER
@@ -274,17 +318,105 @@ case "$PARAM_1" in
             docker container list -a
         fi
    ;;
+   "container:top")
+        docker container ls
+        echo -e "${Gre}Which one? :  ${RCol}\r"
+        read CONTAINER_NAME
+        docker container top "${CONTAINER_NAME}"
+   ;;
+   "container:diff")
+        docker container ls -a
+        echo -e "${Gre}Which one? :  ${RCol}\r"
+        read CONTAINER_NAME
+        docker container diff "${CONTAINER_NAME}"
+   ;;
+   "container:pause")
+        getParams "$@"
+
+        if [[ "${CONTAINER_NAME}" == "" ]]
+        then
+          docker container ls
+          echo -e "${Gre}Which one? :  ${RCol}\r"
+          read CONTAINER_NAME
+        fi
+
+        docker container pause "${CONTAINER_NAME}"
+   ;;
+   "container:unpause")
+        getParams "$@"
+
+        if [[ "${CONTAINER_NAME}" == "" ]]
+        then
+          docker container ls
+          echo -e "${Gre}Which one? :  ${RCol}\r"
+          read CONTAINER_NAME
+        fi
+
+        docker container unpause "${CONTAINER_NAME}"
+   ;;
+   "container:update")
+        getParams "$@"
+
+        if [[ "${CONTAINER_NAME}" == "" ]]
+        then
+          docker container ls -a
+          echo -e "${Gre}Which container? :  ${RCol}\r"
+          read CONTAINER_NAME
+        fi
+
+        if [[ "${COMMAND}" == "" ]]
+        then
+          availableCommands
+          echo -e "${Gre}commnad? :  ${RCol}\r"
+          read COMMAND
+        fi
+
+        docker container update $COMMAND $CONTAINER_NAME
+   ;;
+   "container:wait")
+        getParams "$@"
+
+        if [[ "${CONTAINER_NAME}" == "" ]]
+        then
+          docker container ls -a
+          echo -e "${Gre}Which container? :  ${RCol}\r"
+          read CONTAINER_NAME
+        fi
+
+        docker container wait $CONTAINER_NAME
+   ;;
    "image:build")
         echo -e "${Yel}"
         echo "Build image ${PARAM_2}"
         echo -e "${Divider}${RCol}\r"
         CHECK=$(dockerFileExist)
+        getParams "$@"
 
-        if [[ "${CHECK}" == 1 ]]
+        if [[ "${CHECK}" == 1 && "${TAG_NAME}" == 1 ]]
+        then
+            docker build -t "${IMAGE_NAME}" .
+        elif [[ "${CHECK}" == 1 ]]
         then
           echo -e "${Gre}Tag for image :  ${RCol}\r"
           read IMAGE_NAME
           docker build -t "${IMAGE_NAME}" .
+        fi
+   ;;
+   "image:rebuild")
+        echo -e "${Yel}"
+        echo "Build image ${PARAM_2}"
+        echo -e "${Divider}${RCol}\r"
+        CHECK=$(dockerFileExist)
+        getParams "$@"
+
+        if [[ "${CHECK}" == 1 && "${TAG_NAME}" == 1 ]]
+        then
+            docker build --no-cache -t "${IMAGE_NAME}" -f Dockerfile .
+        elif [[ "${CHECK}" == 1 ]]
+        then
+          echo -e "${Gre}Tag for image :  ${RCol}\r"
+          read IMAGE_NAME
+          docker build --no-cache -t "${IMAGE_NAME}" -f Dockerfile .
         fi
    ;;
    "image:list")
@@ -379,6 +511,73 @@ case "$PARAM_1" in
             eval "${DOCKIFY_FOLDER}/./container"
        fi
    ;;
+   "image:save")
+        IMAGE_NAME="snapshot"
+        docker images | head
+        echo -e "${Yel}Please write container ID :  ${RCol}\r"
+        read IMAGE_ID
+        echo -e "${Yel}Do you want to select a path to save the image snapshot? [y/N]:  ${RCol}\r"
+        read QUESTION
+        QUESTION="${QUESTION,,}"
+
+        if [[ ${QUESTION} = "y" || ${QUESTION} = "yes" ]]
+        then
+          echo -e "${Yel}write the path where you want to save :  ${RCol}\r"
+          read PATH_VAR
+        fi
+
+        QUESTION=""
+
+        echo -e "${Yel}Do you want to specify a name for the file? [y/N]:  ${RCol}\r"
+        read QUESTION
+        QUESTION="${QUESTION,,}"
+
+        if [[ ${QUESTION} = "y" || ${QUESTION} = "yes" ]]
+        then
+          echo -e "${Yel}write name for the file :  ${RCol}\r"
+          read IMAGE_NAME
+        fi
+
+        if [[ "${PATH_VAR}" != "" ]]
+        then
+          docker save $IMAGE_ID > "${PATH_VAR}/${IMAGE_NAME}.tar"
+        else
+          docker save $IMAGE_ID > "${IMAGE_NAME}.tar"
+        fi
+   ;;
+   "image:load")
+      getParams "$@"
+
+      if [[ "${IMAGE_NAME}" == "" ]]
+      then
+        echo -e "${Yel}write image file name to load :  ${RCol}\r"
+        read IMAGE_NAME
+      fi
+
+      if [[ "${IMAGE_NAME}" != "" ]]
+      then
+        docker load < $IMAGE_NAME
+      else
+        echo -e "${Red}you must specify a file name${RCol}\n"
+      fi
+   ;;
+   "image:history")
+      getParams "$@"
+
+      if [[ "${IMAGE_NAME}" == "" ]]
+      then
+        docker images
+        echo -e "${Gre}Which one? :  ${RCol}\r"
+        read IMAGE_NAME
+      fi
+
+      if [[ "${IMAGE_NAME}" != "" ]]
+      then
+        docker history $IMAGE_NAME
+      else
+        echo -e "${Red}you must specify an image id${RCol}\n"
+      fi
+   ;;
    "project:folder:set")
         echo -e "${Yel} You want set the project folder? [y/N]:  ${RCol}\r"
         read QUESTION_SET_FOLDER
@@ -401,6 +600,20 @@ case "$PARAM_1" in
    ;;
    "list")
        usage
+   ;;
+   "events")
+        docker events
+   ;;
+   "search")
+      getParams "$@"
+
+      if [[ "${IMAGE_NAME}" == "" ]]
+      then
+        echo -e "${Gre}What do you want to search? :  ${RCol}\r"
+        read IMAGE_NAME
+      fi
+
+      docker search $IMAGE_NAME
    ;;
    "check-install")
         echo "Installation successfull, good work"
