@@ -610,10 +610,10 @@ case "$PARAM_1" in
   docker-machine ls
   ;;
 "machine:start")
-  docker-machine start $PARAM_2
+  docker-machine start $PARAM_2 ; docker-machine env $PARAM_2
   ;;
 "machine:stop")
-  docker-machine start $PARAM_2
+  docker-machine stop $PARAM_2
   ;;
 "machine:env")
   docker-machine env $PARAM_2
