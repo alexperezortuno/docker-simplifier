@@ -375,18 +375,20 @@ case "$PARAM_1" in
   docker container wait $CONTAINER_NAME
   ;;
 "image:build")
-  echo -e "${Yel}"
-  echo "Build image ${PARAM_2}"
-  echo -e "${Divider}${RCol}\r"
   CHECK=$(dockerFileExist)
   getParams "$@"
 
   if [[ "${CHECK}" == 1 && "${TAG_NAME}" == 1 ]]; then
+    echo -e "${Yel}"
+    echo "Build image ${IMAGE_NAME}"
+    echo -e "${Divider}${RCol}\r"
     docker build -t "${IMAGE_NAME}" .
   elif [[ "${CHECK}" == 1 ]]; then
     echo -e "${Gre}Tag for image :  ${RCol}\r"
     read IMAGE_NAME
     docker build -t "${IMAGE_NAME}" .
+  else
+    echo -e "${Red}Error: Dockerfile not exists${RCol}\r"
   fi
   ;;
 "image:rebuild")
@@ -610,16 +612,42 @@ case "$PARAM_1" in
   docker-machine ls
   ;;
 "machine:start")
-  docker-machine start $PARAM_2 ; docker-machine env $PARAM_2
+  if [[ "${PARAM_2}" == "" ]]; then
+    docker-machine ls
+    echo -e "${Gre}Which image do you want to start? :  ${RCol}\r"
+    read QUESTION
+
+    if [[ "${QUESTION}" == "" ]]; then
+      echo -e "${Red}You need set a valid machine name  ${RCol}\r"
+      exit 2
+    fi
+    docker-machine start "${QUESTION}"
+    docker-machine env "${QUESTION}"
+  else
+    docker-machine start $PARAM_2
+    docker-machine env $PARAM_2
+  fi
   ;;
 "machine:stop")
-  docker-machine stop $PARAM_2
+  if [[ "${PARAM_2}" == "" ]]; then
+    docker-machine ls
+    echo -e "${Gre}Which image do you want to stop? :  ${RCol}\r"
+    read QUESTION
+
+    if [[ "${QUESTION}" == "" ]]; then
+      echo -e "${Red}You need set a valid machine name  ${RCol}\r"
+      exit 2
+    fi
+    docker-machine stop "${QUESTION}"
+  else
+    docker-machine stop "${QUESTION}"
+  fi
   ;;
 "machine:env")
   docker-machine env $PARAM_2
   ;;
 "machine:eval")
-  eval $(docker-machine env ${PARAM_2})
+  eval $(docker-machine env "$PARAM_2")
   ;;
 "machine:ip")
   docker-machine ip $PARAM_2
