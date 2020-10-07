@@ -4,6 +4,7 @@ PARAM_1=$1
 PARAM_2=$2
 PARAM_3=$3
 PARAM_4=$4
+PATH_VAR=""
 LOCAL=0
 ONE=0
 ALL=0
@@ -15,8 +16,14 @@ filename=""
 CONTAINER_NAME=""
 CONTAINER_IMAGE=""
 CONTAINER_PORT="83:83"
+COMMAND=""
 IMAGE_NAME=""
-DOCKER_COMPOSE_FILE="`pwd`/docker-compose.yml"
+IMAGE_ID=""
+COMPATIBILITY=""
+NO_CACHE=""
+FORCE=""
+TAG_NAME=0
+DOCKER_COMPOSE_FILE="$(pwd)/docker-compose.yml"
 
 RCol='\e[0m'
 Yel='\e[033m'
@@ -29,465 +36,683 @@ QUESTION_SET_FOLDER=""
 SET_DOCKIFY_PROJECT_FOLDER=""
 
 function dockerComposeExist() {
-    if [[ -f "$DOCKER_COMPOSE_FILE" ]]; then
-        DOCKER_COMPOSE_FILE_EXIST=1
-    else
-        DOCKER_COMPOSE_FILE_EXIST=0
-        echo -e "${Red}Error: Docker compose file not exists ${RCol}\r"
-        exit 1
-    fi
+  if [[ -f "$DOCKER_COMPOSE_FILE" ]]; then
+    DOCKER_COMPOSE_FILE_EXIST=1
+  else
+    DOCKER_COMPOSE_FILE_EXIST=0
+    echo -e "${Red}Error: Docker compose file not exists ${RCol}\r"
+    exit 1
+  fi
 }
 
 function dockerFileExist() {
-    local __resultvar=$1
-    local FILE="`pwd`/Dockerfile"
+  local __resultvar=$1
+  local FILE="$(pwd)/Dockerfile"
 
-    if [[ -f "$FILE" ]]
-    then
-        echo 1
-    else
-        echo 0
-    fi
+  if [[ -f "$FILE" ]]; then
+    echo 1
+  else
+    echo 0
+  fi
 }
 
 usage() {
-    echo -e "${Gre}"
-       echo -e "Docker Simplifier${RCol}\r"
-       echo -e "${Divider}${RCol}\r"
-       echo -e "${Yel}"
-       echo -e "COMMAND\t\t\t\tDESCRIPTION\n"
-       echo -e "container:create\t\tCreate a new container\r"
-       echo -e "container:init\t\t\tInitialize one or all containers\r"
-       echo -e "container:list\t\t\tList all container\r"
-       echo -e "container:logs\t\t\tSee container log by container\r"
-       echo -e "container:remove\t\tStop and remove one or all containers\r"
-       echo -e "container:start\t\t\tStart one container by name\r"
-       echo -e "container:stop\t\t\tStop container one by name or all\r"
-       echo -e "image:build\t\t\tCreate a new image\r"
-       echo -e "image:remove\t\t\tRemove all images\r"
-       echo -e "image:list\t\t\tList all images installed\r"
-       echo -e "image:push\t\t\tPush images to repository\r"
-       echo -e "image:pull\t\t\tPull all images from dockerhub and registry gitlab\r"
-       echo -e "project:folder:set\r"
-       echo -e "network:list\t\t\tList network\r"
-       echo -e "network:create\t\t\tCreate a network\r"
-       echo -e "network:remove\t\t\tRemove network\r"
-       echo -e "volume:list\t\t\tList volumes\r"
-       echo -e "volume:create\t\t\tCreate a volume\r"
-       echo -e "volume:remove\t\t\tRemove volume\r"
-       echo -e "login\t\t\t\tLogin to repository\r"
-       echo -e "info\t\t\t\tShow grep root info\r"
-       echo -e "clean\t\t\t\tPrune docker\r"
-       echo -e "terminal\t\t\tOpen container terminal\r"
-       echo -e "${RCol}"
+  echo -e "${Gre}"
+  echo -e "Docker Simplifier${RCol}\r"
+  echo -e "${Divider}${RCol}\r"
+  echo -e "${Yel}"
+  echo -e "COMMAND\t\t\t\tDESCRIPTION\n"
+  echo -e "container:create\t\tCreate a new container\r"
+  echo -e "container:init\t\t\tInitialize one or all containers\r"
+  echo -e "container:list\t\t\tList all container\r"
+  echo -e "container:logs\t\t\tSee container log by container\r"
+  echo -e "container:remove\t\tStop and remove one or all containers\r"
+  echo -e "container:start\t\t\tStart one container by name\r"
+  echo -e "container:stop\t\t\tStop container one by name or all\r"
+  echo -e "image:build\t\t\tCreate a new image\r"
+  echo -e "image:remove\t\t\tRemove all images\r"
+  echo -e "image:list\t\t\tList all images installed\r"
+  echo -e "image:push\t\t\tPush images to repository\r"
+  echo -e "image:pull\t\t\tPull all images from dockerhub and registry gitlab\r"
+  echo -e "project:folder:set\r"
+  echo -e "network:list\t\t\tList network\r"
+  echo -e "network:create\t\t\tCreate a network\r"
+  echo -e "network:remove\t\t\tRemove network\r"
+  echo -e "volume:list\t\t\tList volumes\r"
+  echo -e "volume:create\t\t\tCreate a volume\r"
+  echo -e "volume:remove\t\t\tRemove volume\r"
+  echo -e "login\t\t\t\tLogin to repository\r"
+  echo -e "info\t\t\t\tShow grep root info\r"
+  echo -e "clean\t\t\t\tPrune docker\r"
+  echo -e "terminal\t\t\tOpen container terminal\r"
+  echo -e "${RCol}"
+}
+
+availableCommands() {
+  echo -e "${Gre}"
+  echo -e "Available commands${RCol}\r"
+  echo -e "${Divider}${RCol}\r"
+  echo -e "${Yel}"
+  echo -e "--blkio-weight\t\tBlock IO (relative weight), between 10 and 1000, or 0 to disable (default 0)\r"
+  echo -e "--cpu-period\t\tLimit CPU CFS (Completely Fair Scheduler) period\r"
+  echo -e "--cpu-quota\t\tLimit CPU CFS (Completely Fair Scheduler) quota\r"
+  echo -e "--cpu-rt-period\t\tLimit the CPU real-time period in microseconds\r"
+  echo -e "--cpu-rt-runtime\tLimit the CPU real-time runtime in microseconds\r"
+  echo -e "--cpu-shares\t\tCPU shares (relative weight)\r"
+  echo -e "--cpus\t\t\t\tNumber of CPUs\r"
+  echo -e "--cpuset-cpus\t\tCPUs in which to allow execution (0-3, 0,1)\r"
+  echo -e "--cpuset-mems\t\tMEMs in which to allow execution (0-3, 0,1)\r"
+  echo -e "--kernel-memory\t\tKernel memory limit\r"
+  echo -e "--memory\t\t\t\tMemory limit\r"
+  echo -e "--memory-reservation\tMemory soft limit\r"
+  echo -e "--memory-swap\t\tSwap limit equal to memory plus swap: ‘-1’ to enable unlimited swap\r"
+  echo -e "--pids-limit\t\tTune container pids limit (set -1 for unlimited)\r"
+  echo -e "--restart\t\tRestart policy to apply when a container exits\r"
+  echo -e "${RCol}"
 }
 
 getParams() {
-    for var in "$@"
-    do
-        case "${var,,}" in
-            -f | --file )   shift
-                            CUSTOM_FILE=1
-                            filename=" -f ${1} "
-            ;;
-            -l | --local ) LOCAL=1
-            ;;
-            -o | --one ) ONE=1
-            ;;
-            -a | --all ) ALL=1
-            ;;
-            -y | --yes ) YES=1
-            ;;
-            -n | --no ) NO=1
-            ;;
-            -p | --project ) PROJECT=1
-             ;;
-            -h | --help ) usage
-                exit
-            ;;
-            * )
-        esac
-        shift
-    done
+  for var in "$@"; do
+    case "${var,,}" in
+    -f | --file)
+      shift
+      CUSTOM_FILE=1
+      filename=" -f ${1} "
+      ;;
+    -t | --tag)
+      shift
+      TAG_NAME=1
+      IMAGE_NAME="${1}"
+      ;;
+    -l | --local)
+      LOCAL=1
+      ;;
+    -o | --one)
+      ONE=1
+      ;;
+    -a | --all)
+      ALL=1
+      ;;
+    -y | --yes)
+      YES=1
+      ;;
+    -n | --no)
+      NO=1
+      ;;
+    -p | --project)
+      PROJECT=1
+      ;;
+    -h | --help)
+      usage
+      exit
+      ;;
+    -c | --compatibility)
+      COMPATIBILITY="--compatibility"
+      ;;
+    -i | --image-name)
+      shift
+      TAG_NAME=1
+      IMAGE_NAME="${1}"
+      ;;
+    --force)
+      COMPATIBILITY="--force"
+      ;;
+    --no-cache)
+      NO_CACHE="--no-cache"
+      ;;
+    --name)
+      shift
+      CONTAINER_NAME="${1}"
+      ;;
+    --command)
+      shift
+      COMMAND="${1}"
+      ;;
+    *) ;;
+    esac
+    shift
+  done
 }
 
 case "$PARAM_1" in
-   "container:init")
-        echo -e "${Gre}"
-        echo "Initializing container"
-        echo -e "${Divider}${RCol}"
+"container:init")
+  echo -e "${Gre}"
+  echo "Initializing container"
+  echo -e "${Divider}${RCol}"
 
-        getParams "$@"
+  getParams "$@"
 
-        if [[ "${ALL}" == 1 ]]
-        then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
+  if [[ "${ALL}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
 
-            docker-compose ${filename} up -d
-        elif [[ "${ONE}" == 1 ]]
-        then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
+    docker-compose ${filename} ${COMPATIBILITY} up -d
+  elif [[ "${ONE}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
 
-            echo -e "${Yel}Containers running${RCol}\r"
-            echo -e "${Yel}${Divider}${RCol}"
-            docker container ls
-            echo -e "${Yel}Available containers${RCol}\r"
-            echo -e "${Yel}${Divider}${RCol}"
-            docker-compose ${filename} config --services
-            echo -e "${Gre}Which one? :  ${RCol}\r"
-            read CONTAINER_NAME
-            docker-compose ${filename} up -d ${CONTAINER_NAME}
-        elif [[ "${PROJECT}" == 1 ]]
-        then
-            cd $DOCKIFY_PROJECT_FOLDER
+    echo -e "${Yel}Containers running${RCol}\r"
+    echo -e "${Yel}${Divider}${RCol}"
+    docker container ls
+    echo -e "${Yel}Available containers${RCol}\r"
+    echo -e "${Yel}${Divider}${RCol}"
+    docker-compose ${filename} config --services
+    echo -e "${Gre}Which one? :  ${RCol}\r"
+    read CONTAINER_NAME
+    docker-compose ${filename} ${COMPATIBILITY} ${FORCE} up -d ${CONTAINER_NAME}
+  elif [[ "${PROJECT}" == 1 ]]; then
+    cd $DOCKIFY_PROJECT_FOLDER
 
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
 
-            eval "${DOCKIFY_FOLDER}/./container"
-        fi
-   ;;
-   "container:stop")
-        echo -e "${Yel}"
-        echo "Stop container all container"
-        echo -e "${Divider}${RCol}"
-
-        getParams "$@"
-
-        if [[ "${ALL}" == 1 ]]
-        then
-            docker ${filename} stop $(docker ps -a -q)
-        elif [[ "${LOCAL}" == 1 ]]
-        then
-            docker stop $PARAM_2
-        elif [[ "${ONE}" == 1 ]]
-        then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-
-            echo -e "${Yel}Containers running${RCol}\r"
-            echo -e "${Yel}${Divider}${RCol}"
-            docker container ls
-            echo -e "${Yel}Available containers${RCol}\r"
-            echo -e "${Yel}${Divider}${RCol}"
-            docker-compose ${filename} config --services
-            echo -e "${Gre}Which one? :  ${RCol}\r"
-            read CONTAINER_NAME
-            docker-compose ${filename} stop ${CONTAINER_NAME}
-        elif [[ "${PROJECT}" == 1 ]]
-        then
-            cd $DOCKIFY_PROJECT_FOLDER
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-            docker-compose ${filename} stop ${PARAM_2}
-        fi
-   ;;
-   "container:logs")
-        if [[ "${PROJECT}" == 1 ]]
-        then
-            cd $DOCKIFY_PROJECT_FOLDER
-        fi
-
-        if [[ "${CUSTOM_FILE}" == 0 ]]
-        then
-            dockerComposeExist
-        fi
-        echo -e "${Yel}Containers running${RCol}\r"
-        echo -e "${Yel}${Divider}${RCol}"
-        docker container ls
-        echo -e "${Gre}Which one? :  ${RCol}\r"
-        read CONTAINER_NAME
-        docker logs -f ${CONTAINER_NAME}
-   ;;
-   "container:create")
-        echo -e "${Yel}Please write a name for the container :  ${RCol}\r"
-        read CONTAINER_NAME
-        echo -e "${Yel}Please set a port for the container (DEFAULT is 83:83) :  ${RCol}\r"
-        read CONTAINER_PORT
-        echo -e "${Yel}Please set the image from where create the container :  ${RCol}\r"
-        read CONTAINER_IMAGE
-        echo -e "${Yel}Starting process, please wait to finish ${Divider}${RCol}\r"
-        docker run -d --name=${CONTAINER_NAME} -p ${CONTAINER_PORT} ${CONTAINER_IMAGE}
-        echo -e "${Gre} Process finish  ${RCol}\r"
-   ;;
-   "container:remove")
-        echo -e "${Yel}"
-        echo "Removing container"
-        echo -e "${Divider}${RCol}"
-
-        getParams "$@"
-
-        if [[ "${LOCAL}" == 1 ]]
-        then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-            docker-compose ${filename} down
-        elif [[ "${ONE}" == 1 ]]
-        then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-            docker container ls -a
-            echo -e "${Gre}Which one? :  ${RCol}\r"
-            read CONTAINER_NAME
-            docker container stop "${CONTAINER_NAME}"
-            docker container rm -f "${CONTAINER_NAME}"
-        elif [[ "${ALL}" == 1 ]]
-        then
-            docker stop $(docker y imaps -a -q)
-            docker rm $(docker ps -a -q)
-        else
-            echo "Need more params"
-        fi
-   ;;
-   "container:list")
-        getParams "$@"
-
-        if [[ "${CUSTOM_FILE}" == 0 ]]
-        then
-            dockerComposeExist
-        fi
-
-        if [[ "${LOCAL}" == 1 ]]
-        then
-            docker-compose ${filename} config --services
-        elif [[ "${ALL}" == 1 ]]
-        then
-            docker container list -a
-        fi
-   ;;
-   "image:build")
-        echo -e "${Yel}"
-        echo "Build image ${PARAM_2}"
-        echo -e "${Divider}${RCol}\r"
-        CHECK=$(dockerFileExist)
-
-        if [[ "${CHECK}" == 1 ]]
-        then
-          echo -e "${Gre}Tag for image :  ${RCol}\r"
-          read IMAGE_NAME
-          docker build -t "${IMAGE_NAME}" .
-        fi
-   ;;
-   "image:list")
-        getParams "$@"
-
-        if [[ "${LOCAL}" == 1 ]]
-        then
-            docker-compose images config --services
-        else
-            docker image list
-        fi
-   ;;
-   "image:remove")
-        echo -e "${Yel}"
-        echo "Removing all images"
-        echo -e "${Divider}${RCol}"
-
-        getParams "$@"
-
-        if [[ "${LOCAL}" == 1 ]]
-        then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-
-            docker-compose ${filename} down --rmi local
-        elif [[ "${ONE}" == 1 ]]
-        then
-            docker image ls
-            echo -e "${Gre}Which one? :  ${RCol}\r"
-            read IMAGE_NAME
-            docker image rm ${IMAGE_NAME}
-         elif [[ "${ALL}" == 1 ]]
-         then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-
-            # Stop all containers
-            docker stop $(docker ps -a -q)
-            # Remove all containers
-            docker rm $(docker ps -a -q)
-            # Remove all images
-            docker rmi $(docker images -a -q)
-        fi
-        echo -e "${RCol}"
-   ;;
-   "image:push")
-       echo -e "${Yel}"
-       echo "Pushing images"
-       echo -e "${Divider}${RCol}"
-       docker images
-       echo -e "${Gre}Which one? :  ${RCol}\r"
-       read IMAGE_NAME
-       docker push ${IMAGE_NAME}
-   ;;
-   "image:pull")
-       echo -e "${Yel}"
-       echo "Pulling images"
-       echo -e "${Divider}${RCol}"
-
-       getParams "$@"
-
-       if [[ "${ALL}" == 1 ]]
-       then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-
-            docker-compose ${filename} up -d
-       elif [[ "${ONE}" == 1 ]]
-       then
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-            docker-compose ${filename} config --services
-            echo -e "${Gre}Which? :  ${RCol}\r"
-            read QUESTION
-            docker-compose pull ${QUESTION}
-       elif [[ "${PROJECT}" == 1 ]]
-       then
-            cd $DOCKIFY_PROJECT_FOLDER
-            if [[ "${CUSTOM_FILE}" == 0 ]]
-            then
-                dockerComposeExist
-            fi
-
-            eval "${DOCKIFY_FOLDER}/./container"
-       fi
-   ;;
-   "project:folder:set")
-        echo -e "${Yel} You want set the project folder? [y/N]:  ${RCol}\r"
-        read QUESTION_SET_FOLDER
-        QUESTION_SET_FOLDER="${QUESTION_SET_FOLDER,,}"
-
-        if [[ ${QUESTION_SET_FOLDER} = "y" || ${QUESTION_SET_FOLDER} = "yes" ]]
-            then
-            echo -e "${Yel} Write the project folder:  ${RCol}\r"
-            read SET_DOCKIFY_PROJECT_FOLDER
-            SET_DOCKIFY_PROJECT_FOLDER="${SET_DOCKIFY_PROJECT_FOLDER,,}"
-
-            if [[ "${SET_DOCKIFY_PROJECT_FOLDER}" != "" ]]
-                then
-                sed -i 's/export DOCKIFY_PROJECT_FOLDER.*//g' ~/.bashrc
-                echo "export DOCKIFY_PROJECT_FOLDER='${SET_DOCKIFY_PROJECT_FOLDER}'" >> ~/.bashrc
-                eval "source ~/.bashrc"
-                echo -e "${Yel} Success!  ${RCol}\r"
-            fi
-        fi
-   ;;
-   "list")
-       usage
-   ;;
-   "check-install")
-        echo "Installation successfull, good work"
-   ;;
-   "network:list")
-        docker network ls
-   ;;
-   "network:create")
-        echo -e "${Yel}"
-        echo "Creating network"
-        echo -e "${Divider}"
-        docker network create $PARAM_2
-        echo -e "${RCol}"
-   ;;
-   "network:remove")
-        echo -e "${Yel}"
-        echo "Creating network"
-        echo -e "${Divider}"
-        docker network rm $PARAM_2
-        echo -e "${RCol}"
-   ;;
-   "volume:list")
-        docker volume ls
-   ;;
-   "volume:create")
-        echo -e "${Yel}"
-        echo "Creating volumen"
-        echo -e "${Divider}"
-        docker volume create --name=$PARAM_2
-        echo -e "${RCol}"
-   ;;
-   "volume:remove")
-        echo -e "${Yel}"
-        echo "Removing volumen"
-        echo -e "${Divider}"
-
-        getParams "$@"
-
-        if [[ "${ALL}" == 1 ]]
-        then
-            docker volume rm $(docker volume ls -q)
-        elif [[ "${ONE}" == 1 ]]
-        then
-            docker volume rm $PARAM_2
-        else
-            echo -e "\e[7mYou must set a valid volume, these are available\e[0m"
-            docker volume ls -q
-        fi
-        echo -e "${RCol}"
-   ;;
-   "login")
-        DOCKER_USERNAME=""
-        DOCKER_PASSWORD=""
-         echo -e "${Gre}Username:  ${RCol}: ${Yel}"
-         read USERNAME
-         echo -e "${RCol}"
-         echo -e "${Gre}Password:  ${RCol}: ${Yel}"
-         read DOCKER_PASSWORD
-         echo -e "${RCol}"
-         echo -e "${Gre}Log in Docker  ${RCol}\r"
-         docker login --username=${DOCKER_USERNAME} --password=${DOCKER_PASSWORD}
-   ;;
-   "clean")
-        docker system prune
-   ;;
-   "info")
-        docker info | grep -i root
-   ;;
-   "terminal")
-        echo -e "${Yel}"
-        echo "Containers running"
-        echo -e "${Divider}${RCol}"
-        docker ps
-        echo -e "${Gre}Which one? :  ${RCol}\r"
-        read QUESTION
-
-        if [[ "${QUESTION}" == "" ]]
-        then
-            echo -e "${Red}You need set a valid container ID  ${RCol}\r"
-            exit 2
-        fi
-        docker exec -it "${QUESTION}" bash
-   ;;
-   "params")
-        getParams "$@"
-        echo $SOLO
+    eval "${DOCKIFY_FOLDER}/./container"
+  fi
   ;;
-   *)
-    echo -e "${Red}I don't know what to do${RCol}"
-    ;;
+"container:stop")
+  echo -e "${Yel}"
+  echo "Stop container all container"
+  echo -e "${Divider}${RCol}"
+
+  getParams "$@"
+
+  if [[ "${ALL}" == 1 ]]; then
+    docker ${filename} stop $(docker ps -a -q)
+  elif [[ "${LOCAL}" == 1 ]]; then
+    docker stop $PARAM_2
+  elif [[ "${ONE}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+
+    echo -e "${Yel}Containers running${RCol}\r"
+    echo -e "${Yel}${Divider}${RCol}"
+    docker container ls
+    echo -e "${Yel}Available containers${RCol}\r"
+    echo -e "${Yel}${Divider}${RCol}"
+    docker-compose ${filename} config --services
+    echo -e "${Gre}Which one? :  ${RCol}\r"
+    read CONTAINER_NAME
+    docker-compose ${filename} stop ${CONTAINER_NAME}
+  elif [[ "${PROJECT}" == 1 ]]; then
+    cd $DOCKIFY_PROJECT_FOLDER
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+    docker-compose ${filename} stop ${PARAM_2}
+  fi
+  ;;
+"container:logs")
+  if [[ "${PROJECT}" == 1 ]]; then
+    cd $DOCKIFY_PROJECT_FOLDER
+  fi
+
+  if [[ "${CUSTOM_FILE}" == 0 ]]; then
+    dockerComposeExist
+  fi
+  echo -e "${Yel}Containers running${RCol}\r"
+  echo -e "${Yel}${Divider}${RCol}"
+  docker container ls
+  echo -e "${Gre}Which one? :  ${RCol}\r"
+  read CONTAINER_NAME
+  docker logs -f ${CONTAINER_NAME}
+  ;;
+"container:create")
+  echo -e "${Yel}Please write a name for the container :  ${RCol}\r"
+  read CONTAINER_NAME
+  echo -e "${Yel}Please set a port for the container (DEFAULT is 83:83) :  ${RCol}\r"
+  read CONTAINER_PORT
+  echo -e "${Yel}Please set the image from where create the container :  ${RCol}\r"
+  read CONTAINER_IMAGE
+  echo -e "${Yel}Starting process, please wait to finish ${Divider}${RCol}\r"
+  docker run -d --name=${CONTAINER_NAME} -p ${CONTAINER_PORT} ${CONTAINER_IMAGE}
+  echo -e "${Gre} Process finish  ${RCol}\r"
+  ;;
+"container:remove")
+  echo -e "${Yel}"
+  echo "Removing container"
+  echo -e "${Divider}${RCol}"
+
+  getParams "$@"
+
+  if [[ "${LOCAL}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+    docker-compose ${filename} down
+  elif [[ "${ONE}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+    docker container ls -a
+    echo -e "${Gre}Which one? :  ${RCol}\r"
+    read CONTAINER_NAME
+    docker container stop "${CONTAINER_NAME}"
+    docker container rm -f "${CONTAINER_NAME}"
+  elif [[ "${ALL}" == 1 ]]; then
+    docker stop $(docker y imaps -a -q)
+    docker rm $(docker ps -a -q)
+  else
+    echo "Need more params"
+  fi
+  ;;
+"container:list")
+  getParams "$@"
+
+  if [[ "${ALL}" == 1 ]]; then
+    docker container list -a
+  else
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+
+    docker-compose ${filename} config --services
+  fi
+  ;;
+"container:top")
+  docker container ls
+  echo -e "${Gre}Which one? :  ${RCol}\r"
+  read CONTAINER_NAME
+  docker container top "${CONTAINER_NAME}"
+  ;;
+"container:diff")
+  docker container ls -a
+  echo -e "${Gre}Which one? :  ${RCol}\r"
+  read CONTAINER_NAME
+  docker container diff "${CONTAINER_NAME}"
+  ;;
+"container:pause")
+  getParams "$@"
+
+  if [[ "${CONTAINER_NAME}" == "" ]]; then
+    docker container ls
+    echo -e "${Gre}Which one? :  ${RCol}\r"
+    read CONTAINER_NAME
+  fi
+
+  docker container pause "${CONTAINER_NAME}"
+  ;;
+"container:unpause")
+  getParams "$@"
+
+  if [[ "${CONTAINER_NAME}" == "" ]]; then
+    docker container ls
+    echo -e "${Gre}Which one? :  ${RCol}\r"
+    read CONTAINER_NAME
+  fi
+
+  docker container unpause "${CONTAINER_NAME}"
+  ;;
+"container:update")
+  getParams "$@"
+
+  if [[ "${CONTAINER_NAME}" == "" ]]; then
+    docker container ls -a
+    echo -e "${Gre}Which container? :  ${RCol}\r"
+    read CONTAINER_NAME
+  fi
+
+  if [[ "${COMMAND}" == "" ]]; then
+    availableCommands
+    echo -e "${Gre}commnad? :  ${RCol}\r"
+    read COMMAND
+  fi
+
+  docker container update $COMMAND $CONTAINER_NAME
+  ;;
+"container:wait")
+  getParams "$@"
+
+  if [[ "${CONTAINER_NAME}" == "" ]]; then
+    docker container ls -a
+    echo -e "${Gre}Which container? :  ${RCol}\r"
+    read CONTAINER_NAME
+  fi
+
+  docker container wait $CONTAINER_NAME
+  ;;
+"image:build")
+  CHECK=$(dockerFileExist)
+  getParams "$@"
+
+  if [[ "${CHECK}" == 1 && "${TAG_NAME}" == 1 ]]; then
+    echo -e "${Yel}"
+    echo "Build image ${IMAGE_NAME}"
+    echo -e "${Divider}${RCol}\r"
+    docker build -t "${IMAGE_NAME}" .
+  elif [[ "${CHECK}" == 1 ]]; then
+    echo -e "${Gre}Tag for image :  ${RCol}\r"
+    read IMAGE_NAME
+    docker build -t "${IMAGE_NAME}" .
+  else
+    echo -e "${Red}Error: Dockerfile not exists${RCol}\r"
+  fi
+  ;;
+"image:rebuild")
+  echo -e "${Yel}"
+  echo "Build image ${PARAM_2}"
+  echo -e "${Divider}${RCol}\r"
+  CHECK=$(dockerFileExist)
+  getParams "$@"
+
+  if [[ "${CHECK}" == 1 && "${TAG_NAME}" == 1 ]]; then
+    docker build --no-cache -t "${IMAGE_NAME}" -f Dockerfile .
+  elif [[ "${CHECK}" == 1 ]]; then
+    echo -e "${Gre}Tag for image :  ${RCol}\r"
+    read IMAGE_NAME
+    docker build --no-cache -t "${IMAGE_NAME}" -f Dockerfile .
+  fi
+  ;;
+"image:list")
+  getParams "$@"
+
+  if [[ "${LOCAL}" == 1 ]]; then
+    docker-compose images config --services
+  else
+    docker image list
+  fi
+  ;;
+"image:remove")
+  echo -e "${Yel}"
+  echo "Removing all images"
+  echo -e "${Divider}${RCol}"
+
+  getParams "$@"
+
+  if [[ "${LOCAL}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+
+    docker-compose ${filename} down --rmi local
+  elif [[ "${ONE}" == 1 ]]; then
+    docker image ls
+    echo -e "${Gre}Which one? :  ${RCol}\r"
+    read IMAGE_NAME
+    docker image rm ${IMAGE_NAME}
+  elif [[ "${ALL}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+
+    # Stop all containers
+    docker stop $(docker ps -a -q)
+    # Remove all containers
+    docker rm $(docker ps -a -q)
+    # Remove all images
+    docker rmi $(docker images -a -q)
+  fi
+  echo -e "${RCol}"
+  ;;
+"image:push")
+  echo -e "${Yel}"
+  echo "Pushing images"
+  echo -e "${Divider}${RCol}"
+  docker images
+  echo -e "${Gre}Which one? :  ${RCol}\r"
+  read IMAGE_NAME
+  docker push ${IMAGE_NAME}
+  ;;
+"image:pull")
+  echo -e "${Yel}"
+  echo "Pulling images"
+  echo -e "${Divider}${RCol}"
+
+  getParams "$@"
+
+  if [[ "${ALL}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+
+    docker-compose ${filename} up -d
+  elif [[ "${ONE}" == 1 ]]; then
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+    docker-compose ${filename} config --services
+    echo -e "${Gre}Which? :  ${RCol}\r"
+    read QUESTION
+    docker-compose ${filename} pull ${QUESTION}
+  elif [[ "${PROJECT}" == 1 ]]; then
+    cd $DOCKIFY_PROJECT_FOLDER
+    if [[ "${CUSTOM_FILE}" == 0 ]]; then
+      dockerComposeExist
+    fi
+
+    eval "${DOCKIFY_FOLDER}/./container"
+  fi
+  ;;
+"image:save")
+  IMAGE_NAME="snapshot"
+  docker images | head
+  echo -e "${Yel}Please write container ID :  ${RCol}\r"
+  read IMAGE_ID
+  echo -e "${Yel}Do you want to select a path to save the image snapshot? [y/N]:  ${RCol}\r"
+  read QUESTION
+  QUESTION="${QUESTION,,}"
+
+  if [[ ${QUESTION} == "y" || ${QUESTION} == "yes" ]]; then
+    echo -e "${Yel}write the path where you want to save :  ${RCol}\r"
+    read PATH_VAR
+  fi
+
+  QUESTION=""
+
+  echo -e "${Yel}Do you want to specify a name for the file? [y/N]:  ${RCol}\r"
+  read QUESTION
+  QUESTION="${QUESTION,,}"
+
+  if [[ ${QUESTION} == "y" || ${QUESTION} == "yes" ]]; then
+    echo -e "${Yel}write name for the file :  ${RCol}\r"
+    read IMAGE_NAME
+  fi
+
+  if [[ "${PATH_VAR}" != "" ]]; then
+    docker save $IMAGE_ID >"${PATH_VAR}/${IMAGE_NAME}.tar"
+  else
+    docker save $IMAGE_ID >"${IMAGE_NAME}.tar"
+  fi
+  ;;
+"image:load")
+  getParams "$@"
+
+  if [[ "${IMAGE_NAME}" == "" ]]; then
+    echo -e "${Yel}write image file name to load :  ${RCol}\r"
+    read IMAGE_NAME
+  fi
+
+  if [[ "${IMAGE_NAME}" != "" ]]; then
+    docker load <$IMAGE_NAME
+  else
+    echo -e "${Red}you must specify a file name${RCol}\n"
+  fi
+  ;;
+"image:history")
+  getParams "$@"
+
+  if [[ "${IMAGE_NAME}" == "" ]]; then
+    docker images
+    echo -e "${Gre}Which one? :  ${RCol}\r"
+    read IMAGE_NAME
+  fi
+
+  if [[ "${IMAGE_NAME}" != "" ]]; then
+    docker history $IMAGE_NAME
+  else
+    echo -e "${Red}you must specify an image id${RCol}\n"
+  fi
+  ;;
+"project:folder:set")
+  echo -e "${Yel} You want set the project folder? [y/N]:  ${RCol}\r"
+  read QUESTION_SET_FOLDER
+  QUESTION_SET_FOLDER="${QUESTION_SET_FOLDER,,}"
+
+  if [[ ${QUESTION_SET_FOLDER} == "y" || ${QUESTION_SET_FOLDER} == "yes" ]]; then
+    echo -e "${Yel} Write the project folder:  ${RCol}\r"
+    read SET_DOCKIFY_PROJECT_FOLDER
+    SET_DOCKIFY_PROJECT_FOLDER="${SET_DOCKIFY_PROJECT_FOLDER,,}"
+
+    if [[ "${SET_DOCKIFY_PROJECT_FOLDER}" != "" ]]; then
+      sed -i 's/export DOCKIFY_PROJECT_FOLDER.*//g' ~/.bashrc
+      echo "export DOCKIFY_PROJECT_FOLDER='${SET_DOCKIFY_PROJECT_FOLDER}'" >>~/.bashrc
+      eval "source ~/.bashrc"
+      echo -e "${Yel} Success!  ${RCol}\r"
+    fi
+  fi
+  ;;
+"network:list")
+  docker network ls
+  ;;
+"network:create")
+  echo -e "${Yel}"
+  echo "Creating network"
+  echo -e "${Divider}"
+  docker network create $PARAM_2
+  echo -e "${RCol}"
+  ;;
+"network:remove")
+  echo -e "${Yel}"
+  echo "Creating network"
+  echo -e "${Divider}"
+  docker network rm $PARAM_2
+  echo -e "${RCol}"
+  ;;
+"volume:list")
+  docker volume ls
+  ;;
+"volume:create")
+  echo -e "${Yel}"
+  echo "Creating volumen"
+  echo -e "${Divider}"
+  docker volume create --name=$PARAM_2
+  echo -e "${RCol}"
+  ;;
+"volume:remove")
+  echo -e "${Yel}"
+  echo "Removing volumen"
+  echo -e "${Divider}"
+
+  getParams "$@"
+
+  if [[ "${ALL}" == 1 ]]; then
+    docker volume rm $(docker volume ls -q)
+  elif [[ "${ONE}" == 1 ]]; then
+    docker volume rm $PARAM_2
+  else
+    echo -e "\e[7mYou must set a valid volume, these are available\e[0m"
+    docker volume ls -q
+  fi
+  echo -e "${RCol}"
+  ;;
+"machine:list")
+  docker-machine ls
+  ;;
+"machine:start")
+  if [[ "${PARAM_2}" == "" ]]; then
+    docker-machine ls
+    echo -e "${Gre}Which image do you want to start? :  ${RCol}\r"
+    read QUESTION
+
+    if [[ "${QUESTION}" == "" ]]; then
+      echo -e "${Red}You need set a valid machine name  ${RCol}\r"
+      exit 2
+    fi
+    docker-machine start "${QUESTION}"
+    docker-machine env "${QUESTION}"
+  else
+    docker-machine start $PARAM_2
+    docker-machine env $PARAM_2
+  fi
+  ;;
+"machine:stop")
+  if [[ "${PARAM_2}" == "" ]]; then
+    docker-machine ls
+    echo -e "${Gre}Which image do you want to stop? :  ${RCol}\r"
+    read QUESTION
+
+    if [[ "${QUESTION}" == "" ]]; then
+      echo -e "${Red}You need set a valid machine name  ${RCol}\r"
+      exit 2
+    fi
+    docker-machine stop "${QUESTION}"
+  else
+    docker-machine stop "${QUESTION}"
+  fi
+  ;;
+"machine:env")
+  docker-machine env $PARAM_2
+  ;;
+"machine:eval")
+  eval $(docker-machine env "$PARAM_2")
+  ;;
+"machine:ip")
+  docker-machine ip $PARAM_2
+  ;;
+"list")
+  usage
+  ;;
+"events")
+  docker events
+  ;;
+"search")
+  getParams "$@"
+
+  if [[ "${IMAGE_NAME}" == "" ]]; then
+    echo -e "${Gre}What do you want to search? :  ${RCol}\r"
+    read IMAGE_NAME
+  fi
+
+  docker search $IMAGE_NAME
+  ;;
+"check-install")
+  echo "Installation successfull, good work"
+  ;;
+"login")
+  DOCKER_USERNAME=""
+  DOCKER_PASSWORD=""
+  echo -e "${Gre}Username:  ${RCol}: ${Yel}"
+  read USERNAME
+  echo -e "${RCol}"
+  echo -e "${Gre}Password:  ${RCol}: ${Yel}"
+  read DOCKER_PASSWORD
+  echo -e "${RCol}"
+  echo -e "${Gre}Log in Docker  ${RCol}\r"
+  docker login --username=${DOCKER_USERNAME} --password=${DOCKER_PASSWORD}
+  ;;
+"clean")
+  docker system prune
+  ;;
+"info")
+  docker info | grep -i root
+  ;;
+"stats")
+  docker stats --format "table {{.Name}}\t{{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
+  ;;
+"terminal")
+  echo -e "${Yel}"
+  echo "Containers running"
+  echo -e "${Divider}${RCol}"
+  docker ps
+  echo -e "${Gre}Which one? :  ${RCol}\r"
+  read QUESTION
+
+  if [[ "${QUESTION}" == "" ]]; then
+    echo -e "${Red}You need set a valid container ID  ${RCol}\r"
+    exit 2
+  fi
+  docker exec -it "${QUESTION}" bash
+  ;;
+"params")
+  getParams "$@"
+  echo $SOLO
+  ;;
+*)
+  echo -e "${Red}I don't know what to do${RCol}"
+  ;;
 esac
 
 exit 1
