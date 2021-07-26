@@ -375,18 +375,23 @@ case "$PARAM_1" in
   docker container wait $CONTAINER_NAME
   ;;
 "image:build")
-  CHECK=$(dockerFileExist)
   getParams "$@"
+
+  if [[ "${CUSTOM_FILE}" == 0 ]]; then
+    CHECK=$(dockerFileExist)
+  else
+    CHECK=1
+  fi
 
   if [[ "${CHECK}" == 1 && "${TAG_NAME}" == 1 ]]; then
     echo -e "${Yel}"
     echo "Build image ${IMAGE_NAME}"
     echo -e "${Divider}${RCol}\r"
-    docker build -t "${IMAGE_NAME}" .
+    docker build ${filename} -t "${IMAGE_NAME}" .
   elif [[ "${CHECK}" == 1 ]]; then
     echo -e "${Gre}Tag for image :  ${RCol}\r"
     read IMAGE_NAME
-    docker build -t "${IMAGE_NAME}" .
+    docker build ${filename} -t "${IMAGE_NAME}" .
   else
     echo -e "${Red}Error: Dockerfile not exists${RCol}\r"
   fi
