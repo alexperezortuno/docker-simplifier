@@ -2,15 +2,11 @@
 
 PARAM_1=$1
 PARAM_2=$2
-PARAM_3=$3
-PARAM_4=$4
 PATH_VAR=""
 LOCAL=0
 ONE=0
 ALL=0
 PROJECT=0
-TIME="time"
-ID="id"
 CUSTOM_FILE=0
 filename=""
 CONTAINER_NAME=""
@@ -63,7 +59,7 @@ usage() {
   echo -e "${Yel}"
   echo -e "COMMAND\t\t\t\tDESCRIPTION\n"
   echo -e "container:create\t\tCreate a new container\r"
-  echo -e "container:init\t\t\tInitialize one or all containers\r"
+  echo -e "container:start\t\t\tInitialize one or all containers\r"
   echo -e "container:list\t\t\tList all container\r"
   echo -e "container:logs\t\t\tSee container log by container\r"
   echo -e "container:remove\t\tStop and remove one or all containers\r"
@@ -175,7 +171,7 @@ getParams() {
 }
 
 case "$PARAM_1" in
-"container:init")
+"container:start")
   echo -e "${Gre}"
   echo "Initializing container"
   echo -e "${Divider}${RCol}"
@@ -472,8 +468,8 @@ case "$PARAM_1" in
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
       dockerComposeExist
     fi
-
-    docker-compose ${filename} up -d
+    docker-compose pull
+#    docker-compose ${filename} up -d
   elif [[ "${ONE}" == 1 ]]; then
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
       dockerComposeExist
