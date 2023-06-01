@@ -183,7 +183,7 @@ case "$PARAM_1" in
       dockerComposeExist
     fi
 
-    docker-compose ${filename} ${COMPATIBILITY} up -d
+    docker  compose ${filename} ${COMPATIBILITY} up -d
   elif [[ "${ONE}" == 1 ]]; then
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
       dockerComposeExist
@@ -194,10 +194,10 @@ case "$PARAM_1" in
     docker container ls
     echo -e "${Yel}Available containers${RCol}\r"
     echo -e "${Yel}${Divider}${RCol}"
-    docker-compose ${filename} config --services
+    docker  compose ${filename} config --services
     echo -e "${Gre}Which one? :  ${RCol}\r"
     read CONTAINER_NAME
-    docker-compose ${filename} ${COMPATIBILITY} ${FORCE} up -d ${CONTAINER_NAME}
+    docker  compose ${filename} ${COMPATIBILITY} ${FORCE} up -d ${CONTAINER_NAME}
   elif [[ "${PROJECT}" == 1 ]]; then
     cd $DOCKIFY_PROJECT_FOLDER
 
@@ -229,16 +229,16 @@ case "$PARAM_1" in
     docker container ls
     echo -e "${Yel}Available containers${RCol}\r"
     echo -e "${Yel}${Divider}${RCol}"
-    docker-compose ${filename} config --services
+    docker  compose ${filename} config --services
     echo -e "${Gre}Which one? :  ${RCol}\r"
     read CONTAINER_NAME
-    docker-compose ${filename} stop ${CONTAINER_NAME}
+    docker  compose ${filename} stop ${CONTAINER_NAME}
   elif [[ "${PROJECT}" == 1 ]]; then
     cd $DOCKIFY_PROJECT_FOLDER
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
       dockerComposeExist
     fi
-    docker-compose ${filename} stop ${PARAM_2}
+    docker  compose ${filename} stop ${PARAM_2}
   fi
   ;;
 "container:logs")
@@ -278,7 +278,7 @@ case "$PARAM_1" in
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
       dockerComposeExist
     fi
-    docker-compose ${filename} down
+    docker  compose ${filename} down
   elif [[ "${ONE}" == 1 ]]; then
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
       dockerComposeExist
@@ -305,7 +305,7 @@ case "$PARAM_1" in
       dockerComposeExist
     fi
 
-    docker-compose ${filename} config --services
+    docker  compose ${filename} config --services
   fi
   ;;
 "container:top")
@@ -411,7 +411,7 @@ case "$PARAM_1" in
   getParams "$@"
 
   if [[ "${LOCAL}" == 1 ]]; then
-    docker-compose images config --services
+    docker  compose images config --services
   else
     docker image list
   fi
@@ -428,7 +428,7 @@ case "$PARAM_1" in
       dockerComposeExist
     fi
 
-    docker-compose ${filename} down --rmi local
+    docker  compose ${filename} down --rmi local
   elif [[ "${ONE}" == 1 ]]; then
     docker image ls
     echo -e "${Gre}Which one? :  ${RCol}\r"
@@ -468,16 +468,16 @@ case "$PARAM_1" in
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
       dockerComposeExist
     fi
-    docker-compose pull
-#    docker-compose ${filename} up -d
+    docker  compose pull
+#    docker  compose ${filename} up -d
   elif [[ "${ONE}" == 1 ]]; then
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
       dockerComposeExist
     fi
-    docker-compose ${filename} config --services
+    docker  compose ${filename} config --services
     echo -e "${Gre}Which? :  ${RCol}\r"
     read QUESTION
-    docker-compose ${filename} pull ${QUESTION}
+    docker  compose ${filename} pull ${QUESTION}
   elif [[ "${PROJECT}" == 1 ]]; then
     cd $DOCKIFY_PROJECT_FOLDER
     if [[ "${CUSTOM_FILE}" == 0 ]]; then
