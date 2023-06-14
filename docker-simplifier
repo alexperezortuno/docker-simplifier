@@ -108,17 +108,20 @@ availableCommands() {
 }
 
 getParams() {
-  for var in "$@"; do
+    echo $@
+for var in "$@"; do
     case "${var,,}" in
     -f | --file)
       shift
       CUSTOM_FILE=1
-      filename=" -f ${1} "
+      filename=" -f ${2} "
+      shift
       ;;
     -t | --tag)
       shift
       TAG_NAME=1
-      IMAGE_NAME="${1}"
+      IMAGE_NAME="${2}"
+      shift
       ;;
     -l | --local)
       LOCAL=1
@@ -148,7 +151,8 @@ getParams() {
     -i | --image-name)
       shift
       TAG_NAME=1
-      IMAGE_NAME="${1}"
+      IMAGE_NAME="${2}"
+      shift
       ;;
     --force)
       COMPATIBILITY="--force"
@@ -158,15 +162,16 @@ getParams() {
       ;;
     --name)
       shift
-      CONTAINER_NAME="${1}"
+      CONTAINER_NAME="${2}"
+      shift
       ;;
     --command)
       shift
-      COMMAND="${1}"
+      COMMAND="${2}"
+      shift
       ;;
-    *) ;;
+    *);;
     esac
-    shift
   done
 }
 
@@ -378,7 +383,7 @@ case "$PARAM_1" in
   else
     CHECK=1
   fi
-
+    echo $IMAGE_NAME
   if [[ "${CHECK}" == 1 && "${TAG_NAME}" == 1 ]]; then
     echo -e "${Yel}"
     echo "Build image ${IMAGE_NAME}"
