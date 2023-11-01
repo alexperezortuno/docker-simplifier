@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 PARAM_1=$1
 PARAM_2=$2
