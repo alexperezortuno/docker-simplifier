@@ -29,16 +29,6 @@ function alias_installer() {
     echo -e "${Gre} Alias set successfully ${RCol}\n"
 }
 
-echo -e "${Yel} This is the path to the project docker-compose file: ${FILE_LOCATION}? [y/N]:  ${RCol}\r"
-read QUESTION_FOLDER
-QUESTION_FOLDER="${QUESTION_FOLDER,,}"
-
-if [[ ${QUESTION_FOLDER} = "n" || ${QUESTION_FOLDER} = "no" || ${QUESTION_FOLDER} = "nope" ]]
-    then
-    echo -e "${Yel} Please set the folder path to file:  ${RCol}\r"
-    read PROJECT_FOLDER
-fi
-
 if [[ ${IN_FILE} -eq 0 ]]
   then
     echo -e "${Gre}${Divider}${RCol}\n"
