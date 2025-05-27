@@ -153,6 +153,71 @@ explainCommand() {
   fi
 }
 
+allExplanations() {
+  case $1 in
+  logs)
+    EXPLANATION=$(cat <<'EOF'
+The command docker-compose logs -f <CONTAINER_NAME> does the following:
+
+docker-compose logs: Shows the logs (output) of services managed by Docker Compose.
+-f: Follows the log output, similar to tail -f, so you see new log entries in real time.
+CONTAINER_NAME: Specifies the service name (in this case, <CONTAINER_NAME>) whose logs you want to view.
+Additional useful docker-compose log commands:
+
+docker-compose logs <CONTAINER_NAME>: Shows all logs for the <CONTAINER_NAME> service.
+docker-compose logs --tail 100 <CONTAINER_NAME>: Shows only the last 100 lines of logs.
+docker-compose logs --timestamps <CONTAINER_NAME>: Shows logs with timestamps.
+docker-compose logs -f --tail 50 <CONTAINER_NAME>: Follows the last 50 lines of logs in real time.
+docker-compose logs -f: Follows logs for all services in real time.
+docker-compose logs --no-color Produce monochrome output.
+docker-compose logs --no-log-prefix Do not print prefix in logs.
+
+These options help you monitor and debug your Docker Compose services more effectively.
+EOF
+    )
+    ;;
+    stop)
+      EXPLANATION=$(cat <<'EOF'
+docker-compose -f <DOCKER_COMPOSE_FILE> stop <CONTAINER_NAME>
+Uses Docker Compose to stop the specified service (<CONTAINER_NAME>) defined in the compose file (<DOCKER_COMPOSE_FILE>).
+It stops the container(s) managed by that Compose project, using the configuration in the YAML file.
+
+docker stop <CONTAINER_NAME>:
+Directly stops a running container with the name or ID <CONTAINER_NAME> using the Docker CLI, regardless of how it was started.
+
+Summary:
+Use docker-compose stop for containers managed by Compose projects; use docker stop for any container by name or ID.
+EOF
+      )
+    ;;
+    show)
+      EXPLANATION=$(cat <<'EOF'
+The command docker ps lists all running Docker containers on your system.
+It shows details like container ID, image, command, creation time, status, ports, and names.
+By default, it only displays running containers; to see all containers (including stopped ones),
+use docker ps -a.
+EOF
+    )
+    ;;
+    start)
+      EXPLANATION=$(cat <<'EOF'
+The command docker-compose -f <DOCKER_COMPOSE_FILE> up -d <CONTAINER_NAME> does the following:
+Starts a Docker container defined in a Docker Compose file.
+-f <DOCKER_COMPOSE_FILE>: Specifies the Docker Compose file to use.
+-d: Runs the container in detached mode (in the background).
+<CONTAINER_NAME>: The name of the service/container to start as defined in the Docker Compose file.
+If the container is already running, it will not restart it unless you use the --force-recreate option.
+If the container is not running, it will create and start it based on the configuration in the Docker Compose file.
+If not use docker-compose, the command docker start <CONTAINER_NAME> is used to start a stopped container.
+EOF
+    )
+    ;;
+    *)
+      EXPLANATION=""
+    ;;
+  esac
+}
+
 getParams() {
   # Saltar los primeros 2 argumentos (comando y subcomando)
   shift 1
@@ -224,6 +289,7 @@ main() {
     "c:s"|"container:start")
       getParams "$@"
       dockerComposeExist
+      allExplanations "start"
 
       if [ $DOCKER_COMPOSE_FILE_EXIST -eq 1 ] && [ $NO_COMPOSE -eq 0 ]; then
         if [ "$CUSTOM_FILE" -eq 1 ]; then
@@ -257,18 +323,7 @@ main() {
     "c:stop"|"container:stop")
       getParams "$@"
       dockerComposeExist
-      EXPLANATION=$(cat <<'EOF'
-docker-compose -f <DOCKER_COMPOSE_FILE> stop <CONTAINER_NAME>
-Uses Docker Compose to stop the specified service (<CONTAINER_NAME>) defined in the compose file (<DOCKER_COMPOSE_FILE>).
-It stops the container(s) managed by that Compose project, using the configuration in the YAML file.
-
-docker stop <CONTAINER_NAME>:
-Directly stops a running container with the name or ID <CONTAINER_NAME> using the Docker CLI, regardless of how it was started.
-
-Summary:
-Use docker-compose stop for containers managed by Compose projects; use docker stop for any container by name or ID.
-EOF
-      )
+      allExplanations "stop"
 
       if [ $DOCKER_COMPOSE_FILE_EXIST -eq 1 ] && [ $NO_COMPOSE -eq 0 ]; then
         if [ $CUSTOM_FILE -eq 1 ]; then
@@ -286,14 +341,7 @@ EOF
     ;;
     "c:show"|"container:show")
       getParams "$@"
-
-      EXPLANATION=$(cat <<'EOF'
-The command docker ps lists all running Docker containers on your system.
-It shows details like container ID, image, command, creation time, status, ports, and names.
-By default, it only displays running containers; to see all containers (including stopped ones),
-use docker ps -a.
-EOF
-      )
+      allExplanations "show"
 
       docker_cmd="docker ps"
       if [ $ALL -eq 1 ]; then
@@ -303,26 +351,7 @@ EOF
     "c:l"|"container:logs")
       getParams "$@"
       dockerComposeExist
-
-      EXPLANATION=$(cat <<'EOF'
-The command docker-compose logs -f <CONTAINER_NAME> does the following:
-
-docker-compose logs: Shows the logs (output) of services managed by Docker Compose.
--f: Follows the log output, similar to tail -f, so you see new log entries in real time.
-CONTAINER_NAME: Specifies the service name (in this case, <CONTAINER_NAME>) whose logs you want to view.
-Additional useful docker-compose log commands:
-
-docker-compose logs <CONTAINER_NAME>: Shows all logs for the <CONTAINER_NAME> service.
-docker-compose logs --tail 100 <CONTAINER_NAME>: Shows only the last 100 lines of logs.
-docker-compose logs --timestamps <CONTAINER_NAME>: Shows logs with timestamps.
-docker-compose logs -f --tail 50 <CONTAINER_NAME>: Follows the last 50 lines of logs in real time.
-docker-compose logs -f: Follows logs for all services in real time.
-docker-compose logs --no-color Produce monochrome output.
-docker-compose logs --no-log-prefix Do not print prefix in logs.
-
-These options help you monitor and debug your Docker Compose services more effectively.
-EOF
-      )
+      allExplanations "logs"
 
       add_params=""
       if [ $ADD_FOLLOW -eq 1 ]; then
