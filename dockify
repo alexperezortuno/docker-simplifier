@@ -1,0 +1,679 @@
+#!/bin/bash
+
+init_vars() {
+    COMMAND=""
+    CONTAINER_NAME=""
+    EXPLANATION=""
+    FORCE=""
+    FILE_NAME=""
+    NO_CACHE=""
+    TIME=""
+    TAIL=""
+    ALL=0
+    ADD_FOLLOW=0
+    ADD_TAIL=0
+    ADD_TIME=0
+    CUSTOM_FILE=0
+    CONTAINER_NAME_NUM=0
+    EXPLAIN=0
+    TAG_NAME=0
+    NO_COMPOSE=0
+    DOCKER_COMPOSE_FILE_EXIST=0
+    NO_COLOR=0
+    COMPOSE_CMD="docker-compose"
+    VERSION="2.0.0"
+    ADDITIONAL_PARAMS=()
+    CONTAINER_OPTS=()
+    DOCKER_OPTS=()
+}
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+for param in "${ADDITIONAL_PARAMS[@]}"; do
+  if [[ "$param" =~ ^-- ]]; then
+    DOCKER_OPTS+=("$param")
+  else
+    CONTAINER_OPTS+=("$param")
+  fi
+done
+
+confirm_action() {
+    local message="$1"
+    [[ "$FORCE" == "--force" ]] && return 0
+    read -rp "$message (y/N): " confirm
+    [[ "${confirm,,}" == "y" ]]
+}
+
+getParams() {
+  # Saltar el primer argumento (comando principal)
+  shift
+
+  while [ "$#" -gt 0 ]; do
+    case "${1,,}" in
+      -a|--all) ALL=1 ;;
+      -f|--file)
+        shift
+        CUSTOM_FILE=1
+        FILE_NAME="$1"
+        ;;
+      --follow) ADD_FOLLOW=1 ;;
+      -t|--tag|--image-name)
+        shift
+        TAG_NAME=1
+        IMAGE_NAME="$1"
+        ;;
+      --force) FORCE="--force" ;;
+      --no-cache) NO_CACHE="--no-cache" ;;
+      --name)
+        shift
+        CONTAINER_NAME="$1"
+        ;;
+      --command)
+        shift
+        COMMAND="$1"
+        ;;
+      --tail)
+        shift
+        ADD_TAIL=1
+        TAIL="$1"
+        ;;
+      --time)
+        ADD_TIME=1
+        TIME="$1"
+        ;;
+      --no-compose)
+        NO_COMPOSE=1
+        DOCKER_COMPOSE_FILE_EXIST=0
+        ;;
+      --explain) EXPLAIN=1 ;;
+      --no-color) NO_COLOR=1 ;;
+      -h|--help) usage ;;
+      *)
+        # Argumentos no reconocidos
+        if [[ -z "$CONTAINER_NAME" ]]; then
+          CONTAINER_NAME="$1"
+        else
+          ADDITIONAL_PARAMS+=("$1")
+        fi
+        ;;
+    esac
+    shift
+  done
+}
+
+compose_command() {
+  if command -v docker-compose >/dev/null; then
+      COMPOSE_CMD="docker-compose"
+  elif docker compose version >/dev/null 2>&1; then
+      COMPOSE_CMD="docker compose"
+  else
+      echo -e "${RED}Neither docker-compose nor docker compose is available${NC}"
+      return 1
+  fi
+}
+
+docker_compose_exist() {
+    local found_files=()
+    mapfile -t found_files < <(find . -maxdepth 1 -name "docker-compose*.yml" -not -path '*/.*')
+
+    if [ ${#found_files[@]} -gt 0 ]; then
+        if [ -f "docker-compose.yml" ]; then
+            DOCKER_COMPOSE_FILE="docker-compose.yml"
+        else
+            DOCKER_COMPOSE_FILE="${found_files[0]}"
+        fi
+        DOCKER_COMPOSE_FILE_EXIST=1
+        return 0
+    else
+        echo -e "${YELLOW}No se encontraron archivos docker-compose${NC}"
+        DOCKER_COMPOSE_FILE_EXIST=0
+        return 1
+    fi
+}
+
+check_docker_ready() {
+    if ! command -v docker &>/dev/null; then
+        echo -e "${RED}Error: Docker is not installed${NC}"
+        exit 1
+    fi
+
+    if ! docker info &>/dev/null; then
+        echo -e "${RED}Error: The Docker daemon is not running${NC}"
+        exit 1
+    fi
+
+    if ! command -v docker-compose &>/dev/null; then
+        if docker compose version &>/dev/null; then
+            COMPOSE_CMD="docker compose"
+        else
+            echo -e "${YELLOW}Warning: docker-compose is not installed${NC}"
+        fi
+    fi
+}
+
+get_container_name() {
+    echo -e "${YELLOW}Available containers:${NC}"
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+    read -rp "Please enter the container name: " container_name
+    eval "$1=\"$container_name\""
+}
+
+show_command() {
+    local cmd="$1"
+    if [ "$EXPLAIN" -eq 1 ]; then
+        echo -e "${GREEN}Command to execute:${NC} ${YELLOW}$cmd${NC}"
+    fi
+}
+
+explain_command() {
+    local explanation="$1"
+    if [ "$EXPLAIN" -eq 1 ] && [ -n "$explanation" ]; then
+        echo -e "${GREEN}Explanation:${NC}\n${YELLOW}$explanation${NC}"
+    fi
+}
+
+all_explanations() {
+  case $1 in
+  "logs")
+    EXPLANATION=$(cat <<'EOF'
+Command docker-compose logs -f <CONTAINER_NAME>:
+
+- docker-compose logs: Shows the logs of the services managed by Docker Compose
+- -f: Follows the log output in real time (like tail -f)
+- <CONTAINER_NAME>: Name of the service whose logs you want to see
+
+Other useful options:
+--tail NUM: Shows only the last NUM lines
+--timestamps: Shows timestamps
+--no-color: Output without colors
+EOF
+)
+    ;;
+    "stop")
+      EXPLANATION="Stops a Docker container or Docker Compose service"
+    ;;
+    "show")
+      EXPLANATION="Displays the status of Docker containers"
+    ;;
+    "start")
+      EXPLANATION="Start a Docker container or Docker Compose service"
+    ;;
+    "remove")
+      EXPLANATION="Removes a Docker container or Docker Compose service"
+    ;;
+    *)
+      EXPLANATION=""
+    ;;
+  esac
+}
+
+# Implementar funciones para limpieza avanzada
+docker_cleanup() {
+    echo -e "${YELLOW}Opciones de limpieza:${NC}"
+    echo "1. Eliminar contenedores detenidos"
+    echo "2. Eliminar imágenes sin usar"
+    echo "3. Eliminar volúmenes no utilizados"
+    echo "4. Eliminar redes no utilizadas"
+    echo "5. Limpieza completa (prune)"
+    echo "6. Volver"
+
+    read -p "Seleccione opción: " choice
+
+    case $choice in
+        1)
+            docker container prune
+            ;;
+        2)
+            docker image prune
+            ;;
+        3)
+            docker volume prune
+            ;;
+        4)
+            docker network prune
+            ;;
+        5)
+            docker system prune -a
+            ;;
+        6)
+            return
+            ;;
+        *)
+            echo -e "${RED}Opción inválida${NC}"
+            ;;
+    esac
+}
+
+usage() {
+  echo -e "${YELLOW}Dockify v${VERSION}${NC}"
+  cat <<'EOF'
+  Usage: dockify [COMMAND] [OPTIONS] [ARGUMENTS]
+
+  Commands:
+    container:start (c:s)      Start a Docker container
+    container:stop (c:stop)    Stop a Docker container
+    container:show (c:show)    Show running containers
+    container:logs (c:l)       View container logs
+    --cleanup                  Clean Docker resources
+    --help (-h)                Show help (general or for specific command)
+
+  Run 'dockify COMMAND --help' for more information on a specific command.
+EOF
+  exit 0
+}
+
+command_help() {
+  case "${1,,}" in
+    "c:s"|"container:start")
+      cat <<'EOF'
+${YELLOW}Usage: dockify container:start [OPTIONS] [SERVICE]${NC}
+
+Start Docker containers or compose services
+
+Options:
+  --name NAME           Specify container name (for docker commands)
+  --file FILE           Specify custom docker-compose file
+  --no-compose          Use plain docker instead of docker-compose
+  --force               Force recreate containers
+  --no-cache           Disable cache when starting
+
+Examples:
+  dockify c:s                  # Start with interactive name selection
+  dockify c:s --name redis     # Start specific container
+  dockify c:s web              # Start compose service
+  dockify c:s -f docker-compose.prod.yml
+EOF
+      ;;
+    "c:stop"|"container:stop")
+      cat <<'EOF'
+${YELLOW}Usage: dockify container:stop [OPTIONS] [SERVICE]${NC}
+
+Stop Docker containers or compose services
+
+Options:
+  --name NAME           Specify container name (for docker commands)
+  --file FILE           Specify custom docker-compose file
+  --no-compose          Use plain docker instead of docker-compose
+
+Examples:
+  dockify c:stop               # Stop with interactive name selection
+  dockify c:stop --name redis  # Stop specific container
+  dockify c:stop web           # Stop compose service
+EOF
+      ;;
+
+    "c:show"|"container:show")
+      cat <<'EOF'
+${YELLOW}Usage: dockify container:show [OPTIONS]${NC}
+
+Show container status
+
+Options:
+  --all (-a)            Show all containers (including stopped ones)
+
+Examples:
+  dockify c:show        # Show running containers
+  dockify c:show --all  # Show all containers
+EOF
+      ;;
+    "c:l"|"container:logs")
+      cat <<'EOF'
+${YELLOW}Usage: dockify container:logs [OPTIONS] [SERVICE]${NC}
+
+View container logs
+
+Options:
+  --name NAME           Specify container name (for docker commands)
+  --file FILE           Specify custom docker-compose file
+  --no-compose          Use plain docker instead of docker-compose
+  --follow (-f)         Follow log output
+  --tail NUM            Number of lines to show from end of logs
+  --time                Show timestamps
+  --explain             Explain the command being executed
+
+Examples:
+  dockify c:l --follow --tail 100
+  dockify c:l web --timestamps
+EOF
+      ;;
+    "--cleanup")
+      cat <<'EOF'
+${YELLOW}Usage: dockify --cleanup${NC}
+
+Clean up Docker resources
+
+Options:
+  (interactive menu will be shown)
+
+Removes:
+  - Stopped containers
+  - Dangling images
+  - Unused networks
+  - Unused volumes
+EOF
+      ;;
+
+    *)
+      echo -e "${RED}Error: No help available for unknown command '$1'${NC}"
+      usage
+      ;;
+  esac
+  exit 0
+}
+
+run_and_explain() {
+    local cmd="$1"
+    local explanation="$2"
+
+    [ -z "$cmd" ] && return 1
+
+    show_command "$cmd"
+    explain_command "$explanation"
+
+    if eval "$cmd"; then
+        return 0
+    else
+        echo -e "${RED}Error al ejecutar el comando${NC}"
+        return 1
+    fi
+}
+
+docker_cleanup() {
+    # If arguments are provided, handle them directly
+    if [ "$#" -gt 0 ]; then
+        case "$1" in
+            containers)
+                echo -e "${GREEN}Removing stopped containers...${NC}"
+                run_and_explain "docker container prune -f" "Delete all stopped containers"
+                ;;
+            images)
+                echo -e "${GREEN}Deleting unused images...${NC}"
+                run_and_explain "docker image prune -a -f" "Delete all unused images"
+                ;;
+            volumes)
+                echo -e "${GREEN}Deleting unused volumes...${NC}"
+                run_and_explain "docker volume prune -f" "Delete all unused volumes"
+                ;;
+            networks)
+                echo -e "${GREEN}Deleting unused networks...${NC}"
+                run_and_explain "docker network prune -f" "Delete all unused networks"
+                ;;
+            all)
+                echo -e "${GREEN}Performing complete cleaning...${NC}"
+                run_and_explain "docker system prune -a -f --volumes" "Complete cleanup of Docker resources"
+                ;;
+            *)
+                echo -e "${RED}Invalid cleanup option${NC}"
+                echo "Valid options: containers, images, volumes, networks, all"
+                exit 1
+                ;;
+        esac
+        return
+    fi
+
+    # Interactive menu for cleanup options
+    while true; do
+        echo -e "${YELLOW}Cleaning options:${NC}"
+        echo "1. Remove stopped containers"
+        echo "2. Remove unused images"
+        echo "3. Remove unused volumes"
+        echo "4. Remove unused networks"
+        echo "5. Complete clean (prune)"
+        echo "6. Exit cleanup"
+        echo -e "${BLUE}7. Show used space${NC}"
+
+        read -p "Select option (1-7): " choice
+
+        case $choice in
+            1)
+                echo -e "${GREEN}Removing stopped containers...${NC}"
+                run_and_explain "docker container prune -f" "Delete all stopped containers"
+                ;;
+            2)
+                echo -e "${GREEN}Removing stopped images..${NC}"
+                run_and_explain "docker image prune -a -f" "Delete all unused images"
+                ;;
+            3)
+                echo -e "${GREEN}Removing not used volumes...${NC}"
+                run_and_explain "docker volume prune -f" "Delete all unused volumes"
+                ;;
+            4)
+                echo -e "${GREEN}Removing not used networks...${NC}"
+                run_and_explain "docker network prune -f" "Delete all unused networks"
+                ;;
+            5)
+                echo -e "${GREEN}Performing complete cleaning...${NC}"
+                run_and_explain "docker system prune -a -f --volumes" "Complete cleanup of Docker resources"
+                ;;
+            6)
+                return
+                ;;
+            7)
+                echo -e "${YELLOW}Docker used space:${NC}"
+                run_and_explain "docker system df" "Show Docker disk usage"
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                ;;
+        esac
+
+        # Pausa para que el usuario pueda ver los resultados
+        read -p "Press Enter to continue..."
+    done
+}
+
+container_start() {
+    all_explanations "start"
+
+    if [ "$DOCKER_COMPOSE_FILE_EXIST" -eq 1 ] && [ "$NO_COMPOSE" -eq 0 ]; then
+        [ "$CUSTOM_FILE" -eq 1 ] && DOCKER_COMPOSE_FILE="$FILE_NAME"
+        local docker_cmd="$COMPOSE_CMD -f $DOCKER_COMPOSE_FILE up -d"
+        [ -n "$CONTAINER_NAME" ] && docker_cmd+=" $CONTAINER_NAME"
+    else
+        [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+        local docker_cmd="docker start $CONTAINER_NAME"
+    fi
+
+    run_and_explain "$docker_cmd" "$EXPLANATION"
+}
+
+container_stop() {
+    all_explanations "stop"
+
+    if [ "$DOCKER_COMPOSE_FILE_EXIST" -eq 1 ] && [ "$NO_COMPOSE" -eq 0 ]; then
+        [ "$CUSTOM_FILE" -eq 1 ] && DOCKER_COMPOSE_FILE="$FILE_NAME"
+        local docker_cmd="$COMPOSE_CMD -f $DOCKER_COMPOSE_FILE stop"
+        [ -n "$CONTAINER_NAME" ] && docker_cmd+=" $CONTAINER_NAME"
+    else
+        [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+        local docker_cmd="docker stop $CONTAINER_NAME"
+    fi
+
+    run_and_explain "$docker_cmd" "$EXPLANATION"
+}
+
+container_remove() {
+    all_explanations "remove"
+    local force_flag=${FORCE:-""}
+
+    if [ "$DOCKER_COMPOSE_FILE_EXIST" -eq 1 ] && [ "$NO_COMPOSE" -eq 0 ]; then
+        [ "$CUSTOM_FILE" -eq 1 ] && DOCKER_COMPOSE_FILE="$FILE_NAME"
+        local docker_cmd="$COMPOSE_CMD -f $DOCKER_COMPOSE_FILE rm $force_flag"
+        [ -n "$CONTAINER_NAME" ] && docker_cmd+=" $CONTAINER_NAME"
+    else
+        [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+        if confirm_action "Remove the container $CONTAINER_NAME?"; then
+            local docker_cmd="docker rm $force_flag $CONTAINER_NAME"
+        else
+            echo -e "${YELLOW}Operation cancelled${NC}"
+            return
+        fi
+    fi
+
+    run_and_explain "$docker_cmd" "$EXPLANATION"
+}
+
+container_logs() {
+    all_explanations "logs"
+    local add_params=()
+
+    [ "$ADD_FOLLOW" -eq 1 ] && add_params+=("-f")
+    [ "$ADD_TAIL" -eq 1 ] && add_params+=("--tail" "$TAIL")
+    [ "$ADD_TIME" -eq 1 ] && add_params+=("--timestamps")
+    [ "$NO_COLOR" -eq 1 ] && add_params+=("--no-color")
+
+    if [ "$DOCKER_COMPOSE_FILE_EXIST" -eq 1 ] && [ "$NO_COMPOSE" -eq 0 ]; then
+        [ "$CUSTOM_FILE" -eq 1 ] && DOCKER_COMPOSE_FILE="$FILE_NAME"
+        local docker_cmd="$COMPOSE_CMD -f $DOCKER_COMPOSE_FILE logs ${add_params[*]}"
+        [ -n "$CONTAINER_NAME" ] && docker_cmd+=" $CONTAINER_NAME"
+    else
+        [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+        local docker_cmd="docker logs ${add_params[*]} $CONTAINER_NAME"
+    fi
+
+    run_and_explain "$docker_cmd" "$EXPLANATION"
+}
+
+container_show() {
+    all_explanations "show"
+    local docker_cmd="docker ps --format \"table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}\""
+    [ "$ALL" -eq 1 ] && docker_cmd+=" -a"
+
+    run_and_explain "$docker_cmd" "$EXPLANATION"
+}
+
+docker_container() {
+  # if arguments are provided, handle them directly
+  if [ "$#" -gt 0 ]; then
+    getParams "$@"
+    docker_compose_exist
+
+    case "$1" in
+      "-s"|"--start")
+        container_start
+        return
+        ;;
+      "-c"|"--stop")
+        container_stop
+        return
+      ;;
+      "-x"|"--remove")
+        container_remove
+        return
+        ;;
+      "-l"|"--logs")
+        container_logs
+        return
+      ;;
+      "--show")
+        container_show
+        return
+      ;;
+      *)
+        echo -e "${RED}Invalid option${NC}"
+        echo "Valid options: start, stop, remove, logs"
+        exit 1
+        ;;
+    esac
+  fi
+
+  # Interactive menu for container options
+  while true; do
+    echo -e "${YELLOW}Container options:${NC}"
+    echo "1. Start"
+    echo "2. Stop"
+    echo "3. Remove"
+    echo "4. Logs"
+    echo "5. Show"
+    echo "6. Exit"
+
+    read -p "Select option (1-6): " choice
+
+    case $choice in
+        1)
+          all_explanations "start"
+          container_start
+        ;;
+        2)
+          all_explanations "stop"
+          containerStop
+        ;;
+        3)
+          all_explanations "remove"
+          container_remove
+        ;;
+        4)
+          all_explanations "logs"
+          container_logs
+        ;;
+        5)
+          all_explanations "show"
+          container_show
+        ;;
+        6)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option${NC}"
+            ;;
+    esac
+
+    # Pausa para que el usuario pueda ver los resultados
+    read -p "Press Enter to continue..."
+  done
+}
+
+list_compose_projects() {
+    echo -e "${GREEN}Lista de proyectos Docker Compose:${NC}"
+    find . -name "docker-compose.yml" -exec dirname {} \; | sort
+}
+
+# Función principal
+main() {
+  check_docker_ready
+  compose_command
+  # Manage help command
+  for arg in "$@"; do
+    if [[ "${arg,,}" == "--help" || "${arg,,}" == "-h" ]]; then
+      if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        usage
+      else
+        command_help "$1"
+      fi
+    fi
+  done
+
+  case "$1" in
+    "-c"|"--container")
+      shift
+      docker_container "$@"
+    ;;
+    "--cleanup")
+      shift
+      docker_cleanup "$@"
+    ;;
+    "login")
+      USERNAME=""
+      PASSWORD=""
+      echo -e "${YELLOW}Docker Login${NC}"
+      read -rp "Enter your Docker username: " USERNAME
+      read -rp "Enter your Docker password: " PASSWORD
+      docker login --username="$USERNAME" --password="$PASSWORD"
+    ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      usage
+      ;;
+  esac
+}
+
+init_vars
+# Start script
+main "$@"
