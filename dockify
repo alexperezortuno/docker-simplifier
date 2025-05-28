@@ -6,6 +6,7 @@ init_vars() {
     EXPLANATION=""
     FORCE=""
     FILE_NAME=""
+    FULL_INFO=0
     NO_CACHE=""
     TIME=""
     TAIL=""
@@ -49,7 +50,7 @@ confirm_action() {
     [[ "${confirm,,}" == "y" ]]
 }
 
-getParams() {
+get_params() {
   # Saltar el primer argumento (comando principal)
   shift
 
@@ -90,6 +91,9 @@ getParams() {
         NO_COMPOSE=1
         DOCKER_COMPOSE_FILE_EXIST=0
         ;;
+      --full)
+          FULL_INFO=1
+      ;;
       --explain) EXPLAIN=1 ;;
       --no-color) NO_COLOR=1 ;;
       -h|--help) usage ;;
@@ -378,7 +382,7 @@ run_and_explain() {
     if eval "$cmd"; then
         return 0
     else
-        echo -e "${RED}Error al ejecutar el comando${NC}"
+        echo -e "${RED}Command exit${NC}"
         return 1
     fi
 }
@@ -550,7 +554,7 @@ container_show() {
 docker_container() {
   # if arguments are provided, handle them directly
   if [ "$#" -gt 0 ]; then
-    getParams "$@"
+    get_params "$@"
     docker_compose_exist
 
     case "$1" in
@@ -649,11 +653,11 @@ main() {
   done
 
   case "$1" in
-    "-c"|"--container")
+    "c"|"container")
       shift
       docker_container "$@"
     ;;
-    "--cleanup")
+    "cleanup")
       shift
       docker_cleanup "$@"
     ;;
@@ -665,7 +669,24 @@ main() {
       read -rp "Enter your Docker password: " PASSWORD
       docker login --username="$USERNAME" --password="$PASSWORD"
     ;;
-    -h|--help)
+    "stats")
+      echo -e "${YELLOW}Docker Stats${NC}"
+      get_params "$@"
+      stream_param="--no-stream"
+
+      if [ $ADD_FOLLOW -eq 1 ]; then
+          stream_param=""
+      fi
+
+      if [ "$FULL_INFO" -eq 1 ]; then
+          run_and_explain "docker stats $stream_param" "Show detailed stats of all containers"
+          return
+      else
+          run_and_explain "docker stats $stream_param --format \"table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\"" "Show stats of all running containers"
+          return
+      fi
+    ;;
+    "-h"|"--help")
       usage
       ;;
     *)
