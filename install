@@ -25,7 +25,7 @@ function alias_installer() {
     echo -e "${Yel} Set new alias ${RCol}\n"
     echo "export DOCKIFY_FOLDER='${FILE_LOCATION}'" >> ~/.bashrc
     echo "export DOCKIFY_PROJECT_FOLDER='${PROJECT_FOLDER}'" >> ~/.bashrc
-    echo "alias dockify='\$DOCKIFY_FOLDER/./docker-simplifier'" >> ~/.bashrc
+    echo "alias dockify='\$DOCKIFY_FOLDER/./dockify'" >> ~/.bashrc
     echo -e "${Gre} Alias set successfully ${RCol}\n"
 }
 
@@ -53,6 +53,6 @@ echo "#!/bin/bash" > images_to_pull
 echo "" >> images_to_pull
 echo "cd \$DOCKIFY_PROJECT_FOLDER" >> images_to_pull
 sudo chmod +x ${FILE_LOCATION}/container
-sudo chmod +x ${FILE_LOCATION}/docker-simplifier
-sudo ${FILE_LOCATION}/./docker-simplifier check-install
+sudo chmod +x ${FILE_LOCATION}/ddockify
+sudo ${FILE_LOCATION}/./dockify check-install
 exit 1
