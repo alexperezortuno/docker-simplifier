@@ -23,6 +23,8 @@ init_vars() {
     NO_COLOR=0
     COMPOSE_CMD="docker-compose"
     VERSION="2.0.0"
+    REGISTRY_URL="https://registry.hub.docker.com"
+    REGISTRY_CUSTOM=0
     ADDITIONAL_PARAMS=()
     CONTAINER_OPTS=()
     DOCKER_OPTS=()
@@ -96,6 +98,11 @@ get_params() {
       ;;
       --explain) EXPLAIN=1 ;;
       --no-color) NO_COLOR=1 ;;
+      --reg)
+        shift
+        REGISTRY_URL="$1"
+        REGISTRY_CUSTOM=1
+      ;;
       -h|--help) usage ;;
       *)
         # Argumentos no reconocidos
@@ -209,6 +216,9 @@ EOF
     ;;
     "remove")
       EXPLANATION="Removes a Docker container or Docker Compose service"
+    ;;
+    "restart")
+      EXPLANATION="Restarts a Docker container or Docker Compose service"
     ;;
     *)
       EXPLANATION=""
@@ -551,6 +561,413 @@ container_show() {
     run_and_explain "$docker_cmd" "$EXPLANATION"
 }
 
+container_restart() {
+    all_explanations "restart"
+
+    if [ "$DOCKER_COMPOSE_FILE_EXIST" -eq 1 ] && [ "$NO_COMPOSE" -eq 0 ]; then
+        [ "$CUSTOM_FILE" -eq 1 ] && DOCKER_COMPOSE_FILE="$FILE_NAME"
+        local docker_cmd="$COMPOSE_CMD -f $DOCKER_COMPOSE_FILE stop && $COMPOSE_CMD -f $DOCKER_COMPOSE_FILE start"
+        [ -n "$CONTAINER_NAME" ] && docker_cmd+=" $CONTAINER_NAME"
+    else
+        [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+        local docker_cmd="docker stop $CONTAINER_NAME && docker start $CONTAINER_NAME"
+    fi
+
+    run_and_explain "$docker_cmd" "$EXPLANATION"
+}
+
+container_unpause() {
+    all_explanations "unpause"
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    run_and_explain "docker unpause $CONTAINER_NAME" "Resumes a paused container"
+}
+
+container_pause() {
+    all_explanations "pause"
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    run_and_explain "docker pause $CONTAINER_NAME" "Pause one or more containers"
+}
+
+container_stats() {
+    all_explanations "stats"
+
+    if [ $ALL -eq 0 ]; then
+        [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    fi
+
+    local docker_cmd="docker stats $CONTAINER_NAME"
+    [ "$ADD_FOLLOW" -eq 0 ] && docker_cmd+=" --no-stream"
+    [ "$FULL_INFO" -eq 0 ] && docker_cmd+=" --format \"table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}\""
+
+    run_and_explain "$docker_cmd" "Shows real-time statistics of the container"
+}
+
+container_top() {
+    all_explanations "top"
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+
+    run_and_explain "docker top $CONTAINER_NAME" "Shows running processes inside the container"
+}
+
+container_inspect() {
+    all_explanations "inspect"
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+
+    local format=""
+    [ "$NO_COLOR" -eq 1 ] && format="--format \"{{json .}}\""
+
+    run_and_explain "docker inspect $format $CONTAINER_NAME" "Shows the full configuration of the container"
+}
+
+container_env() {
+    all_explanations "env"
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    run_and_explain "docker exec $CONTAINER_NAME env" "Shows the environment variables of the container"
+}
+
+container_exec() {
+    all_explanations "exec"
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+
+    if [ -z "$COMMAND" ]; then
+        read -p "Prompt for command to execute in the container (e.g. /bin/bash): " COMMAND
+    fi
+
+    local docker_cmd="docker exec -it $CONTAINER_NAME $COMMAND"
+    run_and_explain "$docker_cmd" "This command executes a command inside the container"
+}
+
+container_export() {
+    all_explanations "export"
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    read -p "Prompt for output file name (e.g. backup.tar): " output_file
+    run_and_explain "docker export $CONTAINER_NAME > $output_file" "Exports the container's filesystem"
+}
+
+container_commit() {
+    all_explanations "commit"
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    read -p "Name for new image: " image_name
+    run_and_explain "docker commit $CONTAINER_NAME $image_name" "This command creates a new image from the changes made to the container."
+}
+
+image_build() {
+    read -p "Path to Dockerfile (default: ./Dockerfile): " dockerfile_path
+    dockerfile_path=${dockerfile_path:-./Dockerfile}
+    read -p "Image name/tag to build: " image_name
+    run_and_explain "docker build -t $image_name -f $dockerfile_path ." "Builds an image from Dockerfile"
+}
+
+image_history() {
+    read -p "Image name to show history: " image_name
+    if [ $REGISTRY_CUSTOM -eq 1 ]; then
+        image_name="$REGISTRY_URL/$image_name"
+    fi
+    run_and_explain "docker history $image_name" "Shows image layer history"
+}
+
+image_push() {
+    read -p "Image name to push: " image_name
+    if [ $REGISTRY_CUSTOM -eq 1 ]; then
+        reg_image_name="$REGISTRY_URL/$image_name"
+        run_and_explain "docker tag $image_name reg_image_name" "Tags the image with the custom registry URL"
+        image_name="$reg_image_name"
+    fi
+
+    run_and_explain "docker push $image_name" "Pushes image to registry"
+}
+
+image_list() {
+    run_and_explain "docker images" "List all local images"
+}
+
+image_inspect() {
+    read -p "Name of the image to inspect: " image_name
+    if [ $REGISTRY_CUSTOM -eq 1 ]; then
+        image_name="$REGISTRY_URL/$image_name"
+    fi
+    run_and_explain "docker image inspect $image_name" "Show detailed information about an image"
+}
+
+image_delete() {
+    read -p "Name of the image to delete: " image_name
+    if [ $REGISTRY_CUSTOM -eq 1 ]; then
+        image_name="$REGISTRY_URL/$image_name"
+    fi
+
+    if confirm_action "Delete image $image_name?"; then
+        run_and_explain "docker image rm $image_name" "Remove image from local storage"
+    fi
+}
+
+image_download() {
+    read -p "Name of the image to download: " image_name
+    if [ $REGISTRY_CUSTOM -eq 1 ]; then
+        image_name="$REGISTRY_URL/$image_name"
+    fi
+    run_and_explain "docker image pull $image_name" "Download an image from the registry"
+}
+
+container_images() {
+    if [ "$#" -gt 0 ]; then
+        get_params "$@"
+        docker_compose_exist
+
+        case "$1" in
+            "-l"|"--list")
+                image_list
+                return
+            ;;
+            "-i"|"--inspect")
+                image_inspect
+                return
+            ;;
+            "-r"|"--remove")
+                image_delete
+                return
+            ;;
+            "-p"|"--push")
+                image_push
+                return
+            ;;
+            "-d"|"--download")
+                image_download
+                return
+            ;;
+            "-h"|"--history")
+                image_history
+                return
+            ;;
+            "-b"|"--build")
+              image_build
+              return
+            ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                echo ""
+                exit 1
+            ;;
+        esac
+    fi
+
+    while true; do
+        echo -e "${YELLOW}Image operations:${NC}"
+        echo "1. List images"
+        echo "2. Inspect image"
+        echo "3. Delete image"
+        echo "4. Download image"
+        echo "5. Build"
+        echo "6. Show history"
+        echo "7. Push image"
+        echo "8. Back"
+
+        read -p "Select option (1-5): " choice
+
+        case $choice in
+            1)
+                image_list
+                ;;
+            2)
+                image_inspect
+                ;;
+            3)
+                image_delete
+                ;;
+            4)
+                image_download
+                ;;
+            5)
+                image_build
+                ;;
+            6)
+                history
+                ;;
+            7)
+                image_push
+                ;;
+            8)
+                return
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                ;;
+        esac
+        read -p "Press Enter to continue..."
+    done
+}
+
+container_volumes() {
+    while true; do
+        echo -e "${YELLOW}Volume Operations:${NC}"
+        echo "1. List volumes"
+        echo "2. Inspect volume"
+        echo "3. Create volume"
+        echo "4. Remove volume"
+        echo "5. Back"
+
+        read -p "Select option (1-5): " choice
+
+        case $choice in
+            1)
+                run_and_explain "docker volume ls" "List all Docker volumes"
+                ;;
+            2)
+                read -p "Volume name to inspect: " volume_name
+                run_and_explain "docker volume inspect $volume_name" "Show volume details"
+                ;;
+            3)
+                read -p "Name for new volume: " volume_name
+                run_and_explain "docker volume create $volume_name" "Create a new volume"
+                ;;
+            4)
+                read -p "Volume name to remove: " volume_name
+                if confirm_action "Delete volume $volume_name?"; then
+                    run_and_explain "docker volume rm $volume_name" "Remove a volume"
+                fi
+                ;;
+            5)
+                return
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                ;;
+        esac
+
+        read -p "Press Enter to continue..."
+    done
+}
+
+network_list() {
+    run_and_explain "docker network ls" "List all Docker networks"
+}
+
+network_inspect() {
+    read -p "Network name to inspect: " network_name
+    run_and_explain "docker network inspect $network_name" "Show network details"
+}
+
+network_connect() {
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    read -p "Network name: " network_name
+    run_and_explain "docker network connect $network_name $CONTAINER_NAME" "Connect container to network"
+}
+
+network_disconnect() {
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    read -p "Network name: " network_name
+    run_and_explain "docker network disconnect $network_name $CONTAINER_NAME" "Disconnect container from network"
+}
+
+generate_compose() {
+    read -p "Project name: " project_name
+    read -p "Service name: " service_name
+    read -p "Image to use: " image_name
+    read -p "Port mapping (host:container): " port_mapping
+
+    cat << EOF > docker-compose.yml
+version: '3.7'
+services:
+  ${service_name}:
+    image: ${image_name}
+    container_name: ${project_name}_${service_name}
+    ports:
+      - "${port_mapping}"
+EOF
+
+    echo -e "${GREEN}Created docker-compose.yml with basic configuration${NC}"
+}
+
+check_vulnerabilities() {
+    read -p "Image name to scan: " image_name
+    if command -v grype >/dev/null; then
+        run_and_explain "grype $image_name" "Scans image for vulnerabilities (using Grype)"
+    elif command -v trivy >/dev/null; then
+        run_and_explain "trivy image $image_name" "Scans image for vulnerabilities (using Trivy)"
+    else
+        echo -e "${YELLOW}Vulnerability scanner not found. Install Grype or Trivy first.${NC}"
+    fi
+}
+
+docker_network() {
+    if [ "$#" -gt 0 ]; then
+        get_params "$@"
+        docker_compose_exist
+
+        case "$1" in
+            "-l"|"--list")
+                network_list
+                return
+            ;;
+            "-i"|"--inspect")
+                network_inspect
+                return
+            ;;
+            "-c"|"--connect")
+                network_connect
+                return
+            ;;
+            "-d"|"--disconnect")
+                network_disconnect
+                return
+            ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                echo ""
+                exit 1
+            ;;
+        esac
+    fi
+
+    while true; do
+        echo -e "${YELLOW}Network Operations:${NC}"
+        echo "1. List networks"
+        echo "2. Inspect network"
+        echo "3. Connect container to network"
+        echo "4. Disconnect container from network"
+        echo "5. Back"
+
+        read -p "Select option (1-5): " choice
+
+        case $choice in
+            1)
+                network_list
+                ;;
+            2)
+                network_inspect
+                ;;
+            3)
+                network_connect
+                ;;
+            4)
+                network_disconnect
+                ;;
+            5)
+                return
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                ;;
+        esac
+        read -p "Press Enter to continue..."
+    done
+}
+
+container_rename() {
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    read -p "Enter new container name: " new_name
+    run_and_explain "docker rename $CONTAINER_NAME $new_name" "Renames a container"
+}
+
+container_diff() {
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    run_and_explain "docker diff $CONTAINER_NAME" "Shows filesystem changes"
+}
+
+container_port() {
+    [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
+    run_and_explain "docker port $CONTAINER_NAME" "Shows port mappings"
+}
+
 docker_container() {
   # if arguments are provided, handle them directly
   if [ "$#" -gt 0 ]; then
@@ -574,13 +991,65 @@ docker_container() {
         container_logs
         return
       ;;
+      "-r"|"--restart")
+        container_restart
+        return
+      ;;
+      "-p"|"--pause")
+        container_pause
+        return
+      ;;
+      "-u"|"--unpause")
+        container_unpause
+        return
+      ;;
       "--show")
         container_show
         return
       ;;
+      "--stats")
+        container_stats
+        return
+      ;;
+      "--top")
+        container_top
+        return
+      ;;
+      "-i"|"--inspect")
+        container_inspect
+        return
+      ;;
+      "-e"|"--env")
+        container_env
+        return
+      ;;
+      "--export")
+        container_export
+        return
+      ;;
+      "--commit")
+        container_commit
+        return
+      ;;
+      "--exec")
+        container_exec
+        return
+      ;;
+      "--rename")
+        container_rename
+        return
+      ;;
+      "--diff")
+        container_diff
+        return
+      ;;
+      "--port")
+        container_port
+        return
+      ;;
       *)
         echo -e "${RED}Invalid option${NC}"
-        echo "Valid options: start, stop, remove, logs"
+        echo "Valid options: start, stop, remove, logs, restart, pause, unpause, show"
         exit 1
         ;;
     esac
@@ -620,16 +1089,85 @@ docker_container() {
           container_show
         ;;
         6)
-            return
-            ;;
+          return
+        ;;
         *)
-            echo -e "${RED}Invalid option${NC}"
-            ;;
+          echo -e "${RED}Invalid option${NC}"
+        ;;
     esac
 
     # Pausa para que el usuario pueda ver los resultados
     read -p "Press Enter to continue..."
   done
+}
+
+system_events() {
+    run_and_explain "docker events" "Shows real-time Docker events"
+}
+
+system_info() {
+    run_and_explain "docker info" "Displays system-wide information"
+}
+
+system_version() {
+    run_and_explain "docker version" "Shows Docker version information"
+}
+
+docker_system() {
+    if [ "$#" -gt 0 ]; then
+        get_params "$@"
+        docker_compose_exist
+
+        case "$1" in
+            "-i"|"--info")
+                system_info
+                return
+                ;;
+            "-v"|"--version")
+                system_version
+                return
+                ;;
+            "-e"|"--events")
+                system_events
+                return
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                echo "Valid options: info, version, events"
+                exit 1
+                ;;
+        esac
+    fi
+
+    while true; do
+        echo -e "${YELLOW}System options:${NC}"
+        echo "1. Show system info"
+        echo "2. Show Docker version"
+        echo "3. Show Docker events"
+        echo "4. Back"
+
+        read -p "Select option (1-4): " choice
+
+        case $choice in
+            1)
+                system_info
+                ;;
+            2)
+                system_version
+                ;;
+            3)
+                system_events
+                ;;
+            4)
+                return
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                ;;
+        esac
+
+        read -p "Press Enter to continue..."
+    done
 }
 
 list_compose_projects() {
@@ -657,6 +1195,28 @@ main() {
       shift
       docker_container "$@"
     ;;
+    "i"|"image")
+      shift
+      container_images "$@"
+    ;;
+    "v"|"volume")
+      shift
+      container_volumes "$@"
+    ;;
+    "n"|"network")
+      shift
+      docker_network "$@"
+    ;;
+    "s"|"system")
+      shift
+        docker_system "$@"
+    ;;
+    "gencompose")
+      generate_compose
+      ;;
+    "checkvuln")
+        check_vulnerabilities
+        ;;
     "cleanup")
       shift
       docker_cleanup "$@"
@@ -664,10 +1224,14 @@ main() {
     "login")
       USERNAME=""
       PASSWORD=""
+      custom_reg=$REGISTRY_URL
+      if [ $REGISTRY_CUSTOM -eq 1 ]; then
+          custom_reg=$REGISTRY_URL
+      fi
       echo -e "${YELLOW}Docker Login${NC}"
       read -rp "Enter your Docker username: " USERNAME
       read -rp "Enter your Docker password: " PASSWORD
-      docker login --username="$USERNAME" --password="$PASSWORD"
+      docker login --username="$USERNAME" --password="$PASSWORD $custom_reg"
     ;;
     "stats")
       echo -e "${YELLOW}Docker Stats${NC}"
