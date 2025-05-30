@@ -21,6 +21,7 @@ init_vars() {
     NO_COMPOSE=0
     DOCKER_COMPOSE_FILE_EXIST=0
     NO_COLOR=0
+    HELP=0
     COMPOSE_CMD="docker-compose"
     VERSION="2.0.0"
     REGISTRY_URL="https://registry.hub.docker.com"
@@ -52,58 +53,64 @@ confirm_action() {
     [[ "${confirm,,}" == "y" ]]
 }
 
+print_divider() {
+    echo "============================================================================"
+}
+
 get_params() {
   # Saltar el primer argumento (comando principal)
   shift
 
   while [ "$#" -gt 0 ]; do
     case "${1,,}" in
-      -a|--all) ALL=1 ;;
-      -f|--file)
+      "-a"|"--all") ALL=1 ;;
+      "-f"|"--file")
         shift
         CUSTOM_FILE=1
         FILE_NAME="$1"
         ;;
-      --follow) ADD_FOLLOW=1 ;;
-      -t|--tag|--image-name)
+      "--follow") ADD_FOLLOW=1 ;;
+      "-t"|"--tag"|"--image-name")
         shift
         TAG_NAME=1
         IMAGE_NAME="$1"
         ;;
-      --force) FORCE="--force" ;;
-      --no-cache) NO_CACHE="--no-cache" ;;
-      --name)
+      "--force") FORCE="--force" ;;
+      "--no-cache") NO_CACHE="--no-cache" ;;
+      "--name")
         shift
         CONTAINER_NAME="$1"
         ;;
-      --command)
+      "--command")
         shift
         COMMAND="$1"
         ;;
-      --tail)
+      "--tail")
         shift
         ADD_TAIL=1
         TAIL="$1"
         ;;
-      --time)
+      "--time")
         ADD_TIME=1
         TIME="$1"
         ;;
-      --no-compose)
+      "--no-compose")
         NO_COMPOSE=1
         DOCKER_COMPOSE_FILE_EXIST=0
         ;;
-      --full)
+      "--full")
           FULL_INFO=1
       ;;
-      --explain) EXPLAIN=1 ;;
-      --no-color) NO_COLOR=1 ;;
-      --reg)
+      "--explain") EXPLAIN=1 ;;
+      "--no-color") NO_COLOR=1 ;;
+      "--help"|"-h")
+        HELP=1
+      ;;
+      "--reg")
         shift
         REGISTRY_URL="$1"
         REGISTRY_CUSTOM=1
       ;;
-      -h|--help) usage ;;
       *)
         # Argumentos no reconocidos
         if [[ -z "$CONTAINER_NAME" ]]; then
@@ -226,158 +233,419 @@ EOF
   esac
 }
 
-# Implementar funciones para limpieza avanzada
-docker_cleanup() {
-    echo -e "${YELLOW}Opciones de limpieza:${NC}"
-    echo "1. Eliminar contenedores detenidos"
-    echo "2. Eliminar imágenes sin usar"
-    echo "3. Eliminar volúmenes no utilizados"
-    echo "4. Eliminar redes no utilizadas"
-    echo "5. Limpieza completa (prune)"
-    echo "6. Volver"
+help_container_start() {
+cat <<'EOF'
+    Usage: dockify container:start [OPTIONS] [SERVICE]
 
-    read -p "Seleccione opción: " choice
+    Start Docker containers or compose services
 
-    case $choice in
-        1)
-            docker container prune
-            ;;
-        2)
-            docker image prune
-            ;;
-        3)
-            docker volume prune
-            ;;
-        4)
-            docker network prune
-            ;;
-        5)
-            docker system prune -a
-            ;;
-        6)
-            return
-            ;;
-        *)
-            echo -e "${RED}Opción inválida${NC}"
-            ;;
-    esac
+    Options:
+      --name NAME           Specify container name (for docker commands)
+      --file FILE           Specify custom docker-compose file
+      --no-compose          Use plain docker instead of docker-compose
+      --force               Force recreate containers
+      --no-cache            Disable cache when starting
+      --explain             Show explanation of command before execution
+
+    Examples:
+      dockify c -s                  # Start with interactive name selection
+      dockify c -s --name redis     # Start specific container
+      dockify c -s -f docker-compose.prod.yml
+EOF
+print_divider
 }
 
-usage() {
-  echo -e "${YELLOW}Dockify v${VERSION}${NC}"
-  cat <<'EOF'
-  Usage: dockify [COMMAND] [OPTIONS] [ARGUMENTS]
+help_container_stop() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify container:stop [OPTIONS] [SERVICE]${NC}
 
-  Commands:
-    container:start (c:s)      Start a Docker container
-    container:stop (c:stop)    Stop a Docker container
-    container:show (c:show)    Show running containers
-    container:logs (c:l)       View container logs
-    --cleanup                  Clean Docker resources
-    --help (-h)                Show help (general or for specific command)
+    Stop Docker containers or compose services
 
-  Run 'dockify COMMAND --help' for more information on a specific command.
+    Options:
+      --name NAME           Specify container name (for docker commands)
+      --file FILE           Specify custom docker-compose file
+      --no-compose          Use plain docker instead of docker-compose
+      --explain             Show explanation of command before execution
+
+    Examples:
+      dockify c --stop               # Stop with interactive name selection
+      dockify c --stop --name redis  # Stop specific container
+      dockify c -s --name web        # Stop compose service
 EOF
-  exit 0
+print_divider
+}
+
+help_container_remove() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify container:remove [OPTIONS] [SERVICE]${NC}
+
+    Remove Docker containers or compose services
+
+    Options:
+      --name NAME           Specify container name (for docker commands)
+      --file FILE           Specify custom docker-compose file
+      --no-compose          Use plain docker instead of docker-compose
+      --force               Force removal without prompt
+      --explain             Show explanation of command before execution
+
+    Examples:
+      dockify c --remove               # Remove with interactive name selection
+      dockify c --remove --name redis  # Remove specific container
+      dockify c -x --name web          # Remove compose service
+EOF
+print_divider
+}
+
+help_container_log() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify container:logs [OPTIONS] [SERVICE]${NC}
+
+    View container logs
+
+    Options:
+      --name NAME           Specify container name (for docker commands)
+      --file FILE           Specify custom docker-compose file
+      --follow              Follow log output
+      --tail NUM            Number of lines to show from end of logs
+      --time                Show timestamps
+      --no-color            Disable color output
+      --explain             Show explanation of command before execution
+
+    Examples:
+      dockify c --logs --follow --tail 100
+      dockify c --logs --name web --time
+      dockify c -l --name app --no-color
+EOF
+print_divider
+}
+
+help_container_show() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify container:show [OPTIONS]${NC}
+
+    Show container status
+
+    Options:
+      --all (-a)            Show all containers (including stopped ones)
+      --explain             Show explanation of command before execution
+
+    Examples:
+      dockify c:show        # Show running containers
+      dockify c:show --all  # Show all containers
+EOF
+print_divider
+}
+
+help_container_restart() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify container:restart [OPTIONS] [SERVICE]${NC}
+
+    Restart containers
+
+    Options:
+      --name NAME           Container name to restart
+      --file FILE           Use specified docker-compose file
+      --no-compose          Use plain docker instead of docker-compose
+      --explain             Show explanation of command before execution
+
+    Examples:
+      dockify c:restart --name redis
+      dockify c:restart web
+EOF
+print_divider
+}
+
+help_container_execute() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify container:exec [OPTIONS]${NC}
+
+    Execute a command inside a running container
+
+    Options:
+      --name NAME           Container name
+      --command CMD         Command to run inside container
+      --explain             Show explanation before execution
+
+    Examples:
+      dockify c:exec --name web --command "/bin/bash"
+EOF
+print_divider
+}
+
+help_container_stats() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify container:stats [OPTIONS]${NC}
+
+    Show container statistics
+
+    Options:
+      --name NAME           Container name
+      --all                 Show all containers
+      --follow              Continuous stream of stats
+      --full                Show full statistics
+      --explain             Show explanation of command before execution
+
+    Examples:
+      dockify c:stats --name web
+      dockify c:stats --all --full
+EOF
+print_divider
+}
+
+help_image() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify image [OPTIONS]${NC}
+
+    Manage Docker images
+
+    Options:
+      -l, --list            List images
+      -i, --inspect         Inspect image
+      -r, --remove          Remove image
+      -d, --download        Pull image
+      -b, --build           Build new image
+      -h, --history         Show image history
+      -p, --push            Push image to registry
+
+    Examples:
+      dockify image -l
+      dockify image -b
+EOF
+print_divider
+}
+
+help_volume() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify volume${NC}
+
+    Manage Docker volumes
+
+    Options: (interactive menu)
+
+    Examples:
+      dockify volume
+EOF
+print_divider
+}
+
+help_network() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify network [OPTIONS]${NC}
+
+    Manage Docker networks
+
+    Options:
+      -l, --list            List networks
+      -i, --inspect         Inspect a network
+      -c, --connect         Connect container to network
+      -d, --disconnect      Disconnect container from network
+
+    Examples:
+      dockify network -l
+      dockify network -c
+EOF
+print_divider
+}
+
+help_system() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify system [OPTIONS]${NC}
+
+    Show Docker system information
+
+    Options:
+      -i, --info            System information
+      -v, --version         Docker version
+      -e, --events          Docker events
+
+    Examples:
+      dockify system -i
+EOF
+print_divider
+}
+
+help_cleanup() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify cleanup [OPTION]${NC}
+
+    Clean up Docker resources
+
+    Options:
+      containers            Remove stopped containers
+      images                Remove unused images
+      volumes               Remove unused volumes
+      networks              Remove unused networks
+      all                   Perform full system cleanup
+
+    Examples:
+      dockify cleanup
+      dockify cleanup images
+EOF
+print_divider
+}
+
+help_check_vulnerabilities() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify checkvuln${NC}
+
+    Scan Docker images for vulnerabilities using Grype or Trivy
+
+    Examples:
+      dockify checkvuln
+EOF
+print_divider
+}
+
+help_generate_compose() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify gencompose${NC}
+
+    Generate a basic docker-compose.yml file interactively
+
+    Examples:
+      dockify gencompose
+EOF
+print_divider
+}
+
+help_check_install() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify --check-install${NC}
+
+    Check Docker and Compose installation
+
+    Examples:
+      dockify --check-install
+EOF
+print_divider
+}
+
+help_help() {
+cat <<'EOF'
+    Usage: dockify [COMMAND] [SUBCOMMAND] [OPTIONS]
+
+    Available commands:
+      container     Manage Docker containers
+      image         Manage Docker images
+      volume        Manage Docker volumes
+      network       Manage Docker networks
+      system        Docker system info
+      cleanup       Clean up Docker
+      gencompose    Generate docker-compose.yml
+      checkvuln     Scan image vulnerabilities
+      --check-install   Verify Docker installation
+
+    Use:
+      dockify [COMMAND] --help    to get more info
+EOF
+print_divider
+}
+
+help_container_cleanup() {
+cat <<'EOF'
+    ${YELLOW}Usage: dockify cleanup [OPTIONS]${NC}
+
+    Clean up Docker resources
+
+    Options:
+      containers            Remove stopped containers
+      images                Remove unused images
+      volumes               Remove unused volumes
+      networks              Remove unused networks
+      all                   Perform full system cleanup
+
+    Examples:
+      dockify cleanup containers
+      dockify cleanup all
+EOF
+}
+
+help_container_unpause() {
+cat <<'EOF'
+    Usage: dockify container:unpause [OPTIONS]
+
+    Resume a paused container
+
+    Options:
+    --name NAME           Specify container name
+    --explain             Show explanation of command before execution
+
+    Examples:
+    dockify c:unpause --name web
+EOF
 }
 
 command_help() {
   case "${1,,}" in
     "c:s"|"container:start")
-      cat <<'EOF'
-${YELLOW}Usage: dockify container:start [OPTIONS] [SERVICE]${NC}
-
-Start Docker containers or compose services
-
-Options:
-  --name NAME           Specify container name (for docker commands)
-  --file FILE           Specify custom docker-compose file
-  --no-compose          Use plain docker instead of docker-compose
-  --force               Force recreate containers
-  --no-cache           Disable cache when starting
-
-Examples:
-  dockify c:s                  # Start with interactive name selection
-  dockify c:s --name redis     # Start specific container
-  dockify c:s web              # Start compose service
-  dockify c:s -f docker-compose.prod.yml
-EOF
+      help_container_start
+      return
       ;;
     "c:stop"|"container:stop")
-      cat <<'EOF'
-${YELLOW}Usage: dockify container:stop [OPTIONS] [SERVICE]${NC}
-
-Stop Docker containers or compose services
-
-Options:
-  --name NAME           Specify container name (for docker commands)
-  --file FILE           Specify custom docker-compose file
-  --no-compose          Use plain docker instead of docker-compose
-
-Examples:
-  dockify c:stop               # Stop with interactive name selection
-  dockify c:stop --name redis  # Stop specific container
-  dockify c:stop web           # Stop compose service
-EOF
+      help_container_stop
+      return
       ;;
-
+    "c:remove"|"container:remove")
+       help_container_remove
+       return
+      ;;
+    "c:logs"|"container:logs")
+      help_container_log
+      return
+      ;;
     "c:show"|"container:show")
-      cat <<'EOF'
-${YELLOW}Usage: dockify container:show [OPTIONS]${NC}
-
-Show container status
-
-Options:
-  --all (-a)            Show all containers (including stopped ones)
-
-Examples:
-  dockify c:show        # Show running containers
-  dockify c:show --all  # Show all containers
-EOF
+      help_container_show
+      return
       ;;
-    "c:l"|"container:logs")
-      cat <<'EOF'
-${YELLOW}Usage: dockify container:logs [OPTIONS] [SERVICE]${NC}
-
-View container logs
-
-Options:
-  --name NAME           Specify container name (for docker commands)
-  --file FILE           Specify custom docker-compose file
-  --no-compose          Use plain docker instead of docker-compose
-  --follow (-f)         Follow log output
-  --tail NUM            Number of lines to show from end of logs
-  --time                Show timestamps
-  --explain             Explain the command being executed
-
-Examples:
-  dockify c:l --follow --tail 100
-  dockify c:l web --timestamps
-EOF
+    "c:restart"|"container:restart")
+     help_container_restart
+     return
       ;;
-    "--cleanup")
-      cat <<'EOF'
-${YELLOW}Usage: dockify --cleanup${NC}
-
-Clean up Docker resources
-
-Options:
-  (interactive menu will be shown)
-
-Removes:
-  - Stopped containers
-  - Dangling images
-  - Unused networks
-  - Unused volumes
-EOF
+    "c:exec"|"container:exec")
+      help_container_execute
+      return
       ;;
-
+    "c:stats"|"container:stats")
+      help_container_stats
+      return
+      ;;
+    "image")
+      help_image
+      return
+      ;;
+    "v"|"volume")
+      help_volume
+      return
+      ;;
+    "n"|"network")
+      help_network
+      return
+      ;;
+    "s"|"system")
+      help_system
+      return
+      ;;
+    "cleanup")
+      help_cleanup
+      return
+      ;;
+    "checkvuln")
+      help_check_vulnerabilities
+      return
+      ;;
+    "gencompose")
+      help_generate_compose
+      return
+      ;;
+    "--check-install")
+      help_check_install
+      return
+      ;;
     *)
-      echo -e "${RED}Error: No help available for unknown command '$1'${NC}"
-      usage
+      help_help
+      return
       ;;
   esac
-  exit 0
 }
 
 run_and_explain() {
@@ -398,6 +666,15 @@ run_and_explain() {
 }
 
 docker_cleanup() {
+    if [ "$HELP" -eq 1 ]; then
+        help_container_cleanup
+        return
+    fi
+
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
+
     # If arguments are provided, handle them directly
     if [ "$#" -gt 0 ]; then
         case "$1" in
@@ -482,6 +759,14 @@ docker_cleanup() {
 }
 
 container_start() {
+    if [ "$HELP" -eq 1 ]; then
+        help_container_start
+        return
+    fi
+
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "start"
 
     if [ "$DOCKER_COMPOSE_FILE_EXIST" -eq 1 ] && [ "$NO_COMPOSE" -eq 0 ]; then
@@ -497,6 +782,15 @@ container_start() {
 }
 
 container_stop() {
+    if [ "$HELP" -eq 1 ]; then
+        help_container_stop
+        return
+    fi
+
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
+
     all_explanations "stop"
 
     if [ "$DOCKER_COMPOSE_FILE_EXIST" -eq 1 ] && [ "$NO_COMPOSE" -eq 0 ]; then
@@ -512,6 +806,15 @@ container_stop() {
 }
 
 container_remove() {
+    if [ "$HELP" -eq 1 ]; then
+        help_container_remove
+        return
+    fi
+
+    if [ $NO_COMPOSE -eq 0 ]; then
+        docker_compose_exist
+    fi
+
     all_explanations "remove"
     local force_flag=${FORCE:-""}
 
@@ -533,6 +836,15 @@ container_remove() {
 }
 
 container_logs() {
+    if [ "$HELP" -eq 1 ]; then
+        help_container_log
+        return
+    fi
+
+    if [ $NO_COMPOSE -eq 0 ]; then
+        docker_compose_exist
+    fi
+
     all_explanations "logs"
     local add_params=()
 
@@ -554,6 +866,14 @@ container_logs() {
 }
 
 container_show() {
+    if [ "$HELP" -eq 1 ]; then
+        help_container_show
+        return
+    fi
+
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "show"
     local docker_cmd="docker ps --format \"table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}\""
     [ "$ALL" -eq 1 ] && docker_cmd+=" -a"
@@ -562,6 +882,14 @@ container_show() {
 }
 
 container_restart() {
+    if [ "$HELP" -eq 1 ]; then
+        help_container_restart
+        return
+    fi
+
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "restart"
 
     if [ "$DOCKER_COMPOSE_FILE_EXIST" -eq 1 ] && [ "$NO_COMPOSE" -eq 0 ]; then
@@ -577,18 +905,31 @@ container_restart() {
 }
 
 container_unpause() {
+    if [ "$HELP" -eq 1 ]; then
+        help_container_unpause
+        return
+    fi
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "unpause"
     [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
     run_and_explain "docker unpause $CONTAINER_NAME" "Resumes a paused container"
 }
 
 container_pause() {
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "pause"
     [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
     run_and_explain "docker pause $CONTAINER_NAME" "Pause one or more containers"
 }
 
 container_stats() {
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "stats"
 
     if [ $ALL -eq 0 ]; then
@@ -603,6 +944,9 @@ container_stats() {
 }
 
 container_top() {
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "top"
     [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
 
@@ -610,6 +954,9 @@ container_top() {
 }
 
 container_inspect() {
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "inspect"
     [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
 
@@ -620,12 +967,18 @@ container_inspect() {
 }
 
 container_env() {
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "env"
     [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
     run_and_explain "docker exec $CONTAINER_NAME env" "Shows the environment variables of the container"
 }
 
 container_exec() {
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "exec"
     [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
 
@@ -638,6 +991,9 @@ container_exec() {
 }
 
 container_export() {
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "export"
     [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
     read -p "Prompt for output file name (e.g. backup.tar): " output_file
@@ -645,6 +1001,9 @@ container_export() {
 }
 
 container_commit() {
+    if [ $NO_COMPOSE -eq 0 ]; then
+         docker_compose_exist
+    fi
     all_explanations "commit"
     [ -z "$CONTAINER_NAME" ] && get_container_name CONTAINER_NAME
     read -p "Name for new image: " image_name
@@ -972,7 +1331,6 @@ docker_container() {
   # if arguments are provided, handle them directly
   if [ "$#" -gt 0 ]; then
     get_params "$@"
-    docker_compose_exist
 
     case "$1" in
       "-s"|"--start")
@@ -1047,6 +1405,17 @@ docker_container() {
         container_port
         return
       ;;
+      "-h"|"--help")
+        help_container_start
+        help_container_stop
+        help_container_remove
+        help_container_log
+        help_container_show
+        help_container_restart
+        help_container_execute
+        help_container_stats
+        return
+        ;;
       *)
         echo -e "${RED}Invalid option${NC}"
         echo "Valid options: start, stop, remove, logs, restart, pause, unpause, show"
@@ -1175,48 +1544,63 @@ list_compose_projects() {
     find . -name "docker-compose.yml" -exec dirname {} \; | sort
 }
 
+check_docker_ready() {
+    if ! command -v docker &>/dev/null; then
+        echo -e "${RED}Error: Docker is not installed${NC}"
+        exit 1
+    fi
+
+    if ! docker info &>/dev/null; then
+        echo -e "${RED}Error: The Docker daemon is not running${NC}"
+        exit 1
+    fi
+
+    if ! command -v docker-compose &>/dev/null && ! command -v docker compose &>/dev/null; then
+        echo -e "${YELLOW}Warning: docker-compose is not installed${NC}"
+    else
+        COMPOSE_CMD=$(command -v docker-compose || command -v docker compose)
+    fi
+}
+
 # Función principal
 main() {
   check_docker_ready
   compose_command
-  # Manage help command
-  for arg in "$@"; do
-    if [[ "${arg,,}" == "--help" || "${arg,,}" == "-h" ]]; then
-      if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-        usage
-      else
-        command_help "$1"
-      fi
-    fi
-  done
 
   case "$1" in
     "c"|"container")
       shift
       docker_container "$@"
+      return
     ;;
     "i"|"image")
       shift
       container_images "$@"
+        return
     ;;
     "v"|"volume")
       shift
       container_volumes "$@"
+      return
     ;;
     "n"|"network")
       shift
       docker_network "$@"
+        return
     ;;
     "s"|"system")
       shift
-        docker_system "$@"
+      docker_system "$@"
+      return
     ;;
     "gencompose")
       generate_compose
-      ;;
+      return
+    ;;
     "checkvuln")
         check_vulnerabilities
-        ;;
+        return
+    ;;
     "cleanup")
       shift
       docker_cleanup "$@"
@@ -1250,12 +1634,15 @@ main() {
           return
       fi
     ;;
-    "-h"|"--help")
-      usage
-      ;;
+    "--check-install")
+        echo -e "${YELLOW}Checking Docker installation...${NC}"
+        check_docker_ready
+        echo -e "${GREEN}Docker is installed and running${NC}"
+    ;;
     *)
-      usage
-      ;;
+      command_help "$@"
+      return
+    ;;
   esac
 }
 

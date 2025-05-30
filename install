@@ -1,58 +1,80 @@
-#!/bin/bash
-SOURCE="$(readlink -m install)"
-FILE_LOCATION="`pwd`"
-PROJECT_FOLDER="`pwd`"
-PREFIX="/install"
-IN_FILE=$(cat ~/.bashrc | grep -c "dockify")
-PLATFORM=$OSTYPE
-DISTRO=$(cat /etc/*release | grep -c Ubuntu)
-QUESTION_FOLDER=""
+#!/usr/bin/env bash
 
-RCol='\e[0m';
-Yel='\e[0;33m';
-Red='\e[0;31m';
-Gre='\e[0;32m';
-Divider='==============================================================';
+# Output colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-function alias_remove() {
-    echo -e "${Yel} Removing alias ${RCol}\n"
-    sed -i 's/export DOCKIFY_FOLDER.*//g' ~/.bashrc
-    sed -i 's/export DOCKIFY_PROJECT_FOLDER.*//g' ~/.bashrc
-    sed -i 's/alias dockify.*//g' ~/.bashrc
+# Basic configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PWD}"
+BASHRC_FILE="${HOME}/.bashrc"
+ZSHRC_FILE="${HOME}/.zshrc"
+
+# Function to check dependencies
+check_dependencies() {
+    local missing=()
+
+    if ! command -v docker &>/dev/null; then
+        missing+=("docker")
+    fi
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        echo -e "${YELLOW}Warning: The following dependencies are not installed:${NC} ${missing[*]}"
+        return 1
+    fi
+    return 0
 }
 
-function alias_installer() {
-    echo -e "${Yel} Set new alias ${RCol}\n"
-    echo "export DOCKIFY_FOLDER='${FILE_LOCATION}'" >> ~/.bashrc
-    echo "export DOCKIFY_PROJECT_FOLDER='${PROJECT_FOLDER}'" >> ~/.bashrc
-    echo "alias dockify='\$DOCKIFY_FOLDER/./dockify'" >> ~/.bashrc
-    echo -e "${Gre} Alias set successfully ${RCol}\n"
+# Function to set up aliases in the shell configuration file
+setup_alias() {
+    local shell_rc
+
+    # Detect actual shell (bash o zsh)
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        shell_rc="$ZSHRC_FILE"
+    else
+        shell_rc="$BASHRC_FILE"
+    fi
+
+    # Remove previous configurations
+    sed -i '/DOCKIFY_/d' "$shell_rc"
+    sed -i '/alias dockify/d' "$shell_rc"
+
+    # Add new configurations
+    echo -e "\n# Dockify configuration" >> "$shell_rc"
+    echo "export DOCKIFY_DIR='${SCRIPT_DIR}'" >> "$shell_rc"
+    echo "export DOCKIFY_PROJECT_DIR='${PROJECT_DIR}'" >> "$shell_rc"
+    echo "alias dockify='\"\$DOCKIFY_DIR\"/dockify'" >> "$shell_rc"
+    echo "alias dy='\"\$DOCKIFY_DIR\"/dockify'" >> "$shell_rc"
+
+    echo -e "${GREEN}Alias configurado correctamente en ${shell_rc}${NC}"
 }
 
-if [[ ${IN_FILE} -eq 0 ]]
-  then
-    echo -e "${Gre}${Divider}${RCol}\n"
-    alias_installer
-    echo -e "${Gre}${Divider}${RCol}\n"
-else
-    echo -e "${Yel}${Divider}${RCol}\n"
-    alias_remove
-    alias_installer
-    echo -e "${Gre}Testing file${RCol}\n"
-    echo -e "${Yel}${Divider}${RCol}\n"
-fi
+# Principal function to handle the installation
+main() {
+    echo -e "${GREEN}=== Instalación de Dockify ===${NC}"
 
-eval "source ~/.bashrc"
-cd $FILE_LOCATION
-touch container
-touch images_to_pull
-echo "#!/bin/bash" > container
-echo "" >> container
-echo "cd \$DOCKIFY_PROJECT_FOLDER" >> container
-echo "#!/bin/bash" > images_to_pull
-echo "" >> images_to_pull
-echo "cd \$DOCKIFY_PROJECT_FOLDER" >> images_to_pull
-sudo chmod +x ${FILE_LOCATION}/container
-sudo chmod +x ${FILE_LOCATION}/ddockify
-sudo ${FILE_LOCATION}/./dockify check-install
-exit 1
+    # Verify dependencies
+    if ! check_dependencies; then
+        echo -e "${YELLOW}Algunas dependencias no están instaladas. La instalación continuará, pero algunas funciones pueden no estar disponibles.${NC}"
+    fi
+
+    # Set up the script directory
+    setup_alias
+
+    # Set up the script
+    chmod +x "${SCRIPT_DIR}/dockify"
+
+    # Finalize installation
+    echo -e "\n${GREEN}Instalation complete!${NC}"
+    echo -e "You can use the 'dockify' command in any directory."
+    echo -e "Reload your shell configuration with: ${YELLOW}source ~/.bashrc${NC} or ${YELLOW}source ~/.zshrc${NC}"
+
+    # Verify installation
+    "${SCRIPT_DIR}/dockify" --check-install
+}
+
+# Run the main function
+main
