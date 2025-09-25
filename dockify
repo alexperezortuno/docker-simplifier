@@ -641,6 +641,10 @@ command_help() {
       help_check_install
       return
       ;;
+    "--help")
+      help_help
+      return
+      ;;
     *)
       help_help
       return
