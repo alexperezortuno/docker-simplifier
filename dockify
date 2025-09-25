@@ -642,7 +642,7 @@ command_help() {
       return
       ;;
     "--help")
-      help_help
+      help_image
       return
       ;;
     *)
