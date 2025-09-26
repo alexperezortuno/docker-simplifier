@@ -642,7 +642,7 @@ command_help() {
       return
       ;;
     "--help")
-      help_image
+      help_help
       return
       ;;
     *)
@@ -1021,6 +1021,13 @@ image_build() {
     run_and_explain "docker build -t $image_name -f $dockerfile_path ." "Builds an image from Dockerfile"
 }
 
+image_build_force() {
+    read -p "Path to Dockerfile (default: ./Dockerfile): " dockerfile_path
+    dockerfile_path=${dockerfile_path:-./Dockerfile}
+    read -p "Image name/tag to build: " image_name
+    run_and_explain "docker build -t $image_name --no-cache -f $dockerfile_path ." "Builds an image from Dockerfile"
+}
+
 image_history() {
     read -p "Image name to show history: " image_name
     if [ $REGISTRY_CUSTOM -eq 1 ]; then
@@ -1105,6 +1112,10 @@ container_images() {
               image_build
               return
             ;;
+            "--force-build")
+              image_build_force
+              return
+            ;;
             *)
                 echo -e "${RED}Invalid option${NC}"
                 echo ""
@@ -1120,9 +1131,10 @@ container_images() {
         echo "3. Delete image"
         echo "4. Download image"
         echo "5. Build"
-        echo "6. Show history"
-        echo "7. Push image"
-        echo "8. Back"
+        echo "6. Force build"
+        echo "7. Show history"
+        echo "8. Push image"
+        echo "9. Back"
 
         read -p "Select option (1-5): " choice
 
@@ -1143,12 +1155,15 @@ container_images() {
                 image_build
                 ;;
             6)
-                history
+                image_build_force
                 ;;
             7)
-                image_push
+                history
                 ;;
             8)
+                image_push
+                ;;
+            9)
                 return
                 ;;
             *)
